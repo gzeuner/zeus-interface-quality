@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "delivery.schema.json",
+  "title": "Delivery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "deliveryId",
+    "quantity",
+    "email",
+    "address"
+  ],
+  "properties": {
+    "deliveryId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "address": {
+      "$ref": "refs/address.schema.json"
+    }
+  }
+}

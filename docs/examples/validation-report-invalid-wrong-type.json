@@ -1,0 +1,12 @@
+{
+  "status": "INVALID",
+  "valid": false,
+  "findings": [
+    {
+      "instancePath": "/quantity",
+      "schemaPath": "/properties/quantity/type",
+      "keyword": "type",
+      "message": "string gefunden, integer erwartet"
+    }
+  ]
+}

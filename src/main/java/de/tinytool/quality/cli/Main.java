@@ -10,7 +10,8 @@ import picocli.CommandLine.Command;
         name = "zeus-interface-quality",
         mixinStandardHelpOptions = true,
         version = "0.1.0-SNAPSHOT",
-        description = "Technology-agnostic interface quality tool."
+        description = "Technology-agnostic interface quality tool.",
+        subcommands = ValidateCommand.class
 )
 public final class Main implements Runnable {
 

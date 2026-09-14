@@ -12,5 +12,6 @@ class MainTest {
         CommandLine commandLine = new CommandLine(new Main());
 
         assertThat(commandLine.getCommandName()).isEqualTo("zeus-interface-quality");
+        assertThat(commandLine.getSubcommands()).containsKey("validate");
     }
 }

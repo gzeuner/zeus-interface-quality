@@ -1,0 +1,10 @@
+{
+  "deliveryId": "DEL-1001",
+  "quantity": 3,
+  "email": "not-an-email",
+  "address": {
+    "street": "Hauptstraße 1",
+    "postalCode": "10115",
+    "city": "Berlin"
+  }
+}

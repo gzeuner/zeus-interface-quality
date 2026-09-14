@@ -6,7 +6,7 @@ The project accompanies the German [tiny-tool.de project page](https://tiny-tool
 
 ## Status
 
-Iteration 1 is being implemented.
+The first vertical slice of iteration 1 is implemented.
 
 The first iteration is deliberately small:
 
@@ -15,6 +15,17 @@ The first iteration is deliberately small:
 - provide readable text output and a machine-readable JSON report;
 - return deterministic exit codes for scripts and CI;
 - run offline without contacting a remote schema or service.
+
+The implemented CLI command is:
+
+```text
+java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
+  --schema path/to/schema.json \
+  --input path/to/input.json \
+  --report json
+```
+
+Exit codes are deterministic: `0` means valid, `1` means validation failed, and `2` means an operational or command error. The JSON report contract is documented in [`docs/contracts/validation-report-v1.md`](docs/contracts/validation-report-v1.md); an invalid example is available at [`docs/examples/validation-report-invalid-wrong-type.json`](docs/examples/validation-report-invalid-wrong-type.json).
 
 HTTP, SFTP, FTP, CSV, XML, YAML-specific syntax, semantic rules, and real counterpart systems are intentionally out of scope for this iteration.
 

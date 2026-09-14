@@ -1,0 +1,11 @@
+{
+  "deliveryId": "DEL-1001",
+  "quantity": 3,
+  "email": "ops@example.org",
+  "address": {
+    "street": "Hauptstraße 1",
+    "postalCode": "10115",
+    "city": "Berlin"
+  },
+  "unexpected": true
+}

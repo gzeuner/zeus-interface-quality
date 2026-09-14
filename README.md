@@ -6,7 +6,7 @@ The project accompanies the German [tiny-tool.de project page](https://tiny-tool
 
 ## Status
 
-The first vertical slice of iteration 1 is implemented.
+Iteration 1 is complete.
 
 The first iteration is deliberately small:
 
@@ -14,7 +14,8 @@ The first iteration is deliberately small:
 - report all structural findings with stable paths and keywords;
 - provide readable text output and a machine-readable JSON report;
 - return deterministic exit codes for scripts and CI;
-- run offline without contacting a remote schema or service.
+- run offline without contacting a remote schema or service;
+- verify tests, packaging, and the executable JAR in GitHub Actions.
 
 The implemented CLI command is:
 

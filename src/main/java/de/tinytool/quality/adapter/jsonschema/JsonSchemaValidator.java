@@ -52,6 +52,7 @@ public final class JsonSchemaValidator implements Validator {
             JsonNode schemaNode = objectMapper.readTree(schemaFile.toFile());
             Schema validatorSchema = createRegistry(schemaDirectory)
                     .getSchema(SchemaLocation.of(schemaFile.toUri().toString()), schemaNode);
+            validatorSchema.initializeValidators();
 
             List<Error> errors = validatorSchema.validate(inputNode);
             if (errors.isEmpty()) {

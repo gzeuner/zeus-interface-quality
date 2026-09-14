@@ -33,9 +33,21 @@ class JsonSchemaValidatorTest {
         assertThat(result.status()).isEqualTo(Status.INVALID);
         assertThat(result.findings()).anySatisfy(finding -> {
             assertThat(finding.instancePath()).isEqualTo("/quantity");
-            assertThat(finding.schemaPath()).contains("/properties/quantity/type");
+            assertThat(finding.schemaPath()).isEqualTo("/properties/quantity/type");
             assertThat(finding.keyword()).isEqualTo("type");
             assertThat(finding.message()).isNotBlank();
+        });
+    }
+
+    @Test
+    void reportsUnknownPropertiesAtTheDocumentRoot() throws Exception {
+        ValidationResult result = validateFixture("invalid-additional-property.json");
+
+        assertThat(result.status()).isEqualTo(Status.INVALID);
+        assertThat(result.findings()).anySatisfy(finding -> {
+            assertThat(finding.instancePath()).isEqualTo("");
+            assertThat(finding.schemaPath()).isEqualTo("/additionalProperties");
+            assertThat(finding.keyword()).isEqualTo("additionalProperties");
         });
     }
 
@@ -59,6 +71,18 @@ class JsonSchemaValidatorTest {
 
         Files.writeString(schema, "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$ref\":\"../outside.schema.json\"}");
         Files.writeString(outsideSchema, "{\"type\":\"object\"}");
+        Files.writeString(input, "{}");
+
+        assertThatThrownBy(() -> validator.validate(input, schema))
+                .isInstanceOf(ValidationException.class);
+    }
+
+    @Test
+    void rejectsHttpReferencesWithoutNetworkAccess(@TempDir Path tempDirectory) throws IOException {
+        Path schema = tempDirectory.resolve("root.schema.json");
+        Path input = tempDirectory.resolve("input.json");
+
+        Files.writeString(schema, "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$ref\":\"https://example.invalid/schema.json\"}");
         Files.writeString(input, "{}");
 
         assertThatThrownBy(() -> validator.validate(input, schema))

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: JDK 21 build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run tests
+        run: ./mvnw -B test
+
+      - name: Build package
+        run: ./mvnw -B package
+
+      - name: Smoke test valid fixture
+        run: >-
+          java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
+          --schema src/test/resources/fixtures/delivery.schema.json
+          --input src/test/resources/fixtures/valid-delivery.json
+
+      - name: Smoke test invalid fixture
+        shell: bash
+        run: |
+          set +e
+          java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
+            --schema src/test/resources/fixtures/delivery.schema.json \
+            --input src/test/resources/fixtures/invalid-wrong-type.json
+          exit_code=$?
+          test "$exit_code" -eq 1

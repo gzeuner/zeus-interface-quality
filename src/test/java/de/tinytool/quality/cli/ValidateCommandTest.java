@@ -60,6 +60,23 @@ class ValidateCommandTest {
         assertThat(errors.toString()).contains("ERROR:");
     }
 
+    @Test
+    void returnsTwoForMalformedJsonWithoutPrintingAStacktrace() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--schema", fixture("delivery.schema.json").toString(),
+                "--input", fixture("malformed.json").toString());
+
+        assertThat(exitCode).isEqualTo(2);
+        assertThat(output.toString()).isEmpty();
+        assertThat(errors.toString()).contains("ERROR:")
+                .doesNotContain("\tat ")
+                .doesNotContain("Exception");
+    }
+
     private static CommandLine commandLine(ByteArrayOutputStream output, ByteArrayOutputStream errors) {
         return new CommandLine(new ValidateCommand(new JsonSchemaValidator()))
                 .setOut(new PrintWriter(output, true))

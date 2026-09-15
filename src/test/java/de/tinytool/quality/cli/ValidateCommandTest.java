@@ -3,11 +3,16 @@ package de.tinytool.quality.cli;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tinytool.quality.adapter.jsonschema.JsonSchemaValidator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.Objects;
+import java.util.Locale;
 
 import picocli.CommandLine;
 
@@ -48,6 +53,30 @@ class ValidateCommandTest {
     }
 
     @Test
+    void actualReportMatchesFrozenExampleOnAnEnglishHost() throws Exception {
+        Locale previous = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.US);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ByteArrayOutputStream errors = new ByteArrayOutputStream();
+            CommandLine cli = new CommandLine(new Main())
+                    .setOut(new PrintWriter(output, true))
+                    .setErr(new PrintWriter(errors, true));
+            int exitCode = cli.execute("validate",
+                    "--schema", fixture("delivery.schema.json"),
+                    "--input", fixture("invalid-wrong-type.json"), "--report", "json");
+
+            ObjectMapper mapper = new ObjectMapper();
+            assertThat(exitCode).withFailMessage(errors::toString).isEqualTo(1);
+            assertThat(mapper.readTree(output.toString()))
+                    .isEqualTo(mapper.readTree(Path.of(fixture("expected-invalid-wrong-type-report.json")).toFile()));
+            assertThat(errors.toString()).isEmpty();
+        } finally {
+            Locale.setDefault(previous);
+        }
+    }
+
+    @Test
     void returnsTwoForOperationalErrors() {
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
         CommandLine commandLine = commandLine(new ByteArrayOutputStream(), errors);
@@ -75,6 +104,21 @@ class ValidateCommandTest {
         assertThat(errors.toString()).contains("ERROR:")
                 .doesNotContain("\tat ")
                 .doesNotContain("Exception");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "{} {}", "{\"id\":1,\"id\":2}"})
+    void parsingFailuresProduceExitTwoAndNoReport(String json, @TempDir Path directory) throws Exception {
+        Path input = Files.writeString(directory.resolve("input.json"), json);
+        Path schema = Files.writeString(directory.resolve("schema.json"), "true");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        int code = commandLine(output, errors).execute(
+                "--schema", schema.toString(), "--input", input.toString(), "--report", "json");
+
+        assertThat(code).isEqualTo(2);
+        assertThat(output.toString()).isEmpty();
+        assertThat(errors.toString()).startsWith("ERROR:").doesNotContain("\tat ");
     }
 
     private static CommandLine commandLine(ByteArrayOutputStream output, ByteArrayOutputStream errors) {

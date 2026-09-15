@@ -27,7 +27,10 @@ class JsonReportWriterTest {
         ));
 
         JsonNode report = objectMapper.readTree(new JsonReportWriter().write(result));
-        JsonNode expected = objectMapper.readTree(expectedReport());
+        JsonNode expected;
+        try (InputStream stream = expectedReport()) {
+            expected = objectMapper.readTree(stream);
+        }
 
         assertThat(report).isEqualTo(expected);
 

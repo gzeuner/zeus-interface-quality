@@ -31,6 +31,19 @@ Der CLI-Aufruf mit `valid-delivery.json` endet reproduzierbar mit Exit `0`. Der 
 
 HTTP, SFTP, FTP, CSV, XML, YAML-spezifische Syntax, semantische Regeln und Spring Boot bleiben bewusst außerhalb dieser Iteration.
 
+## Nachprüfung vom 15. September 2026
+
+Die erste Abnahme prüfte die vereinbarten Beispiele. Zusätzliche Regressionstests haben anschließend Lücken bei vollständigem Einlesen und bei der Reproduzierbarkeit des Reports sichtbar gemacht:
+
+- Leere Dateien, mehrere JSON-Werte und nachgestellte Inhalte konnten ohne Parsing-Fehler durchgehen. Jetzt ist genau ein vollständiges JSON-Dokument erforderlich.
+- Doppelte Objektschlüssel wurden überschrieben. Sie werden jetzt als mehrdeutige Eingabe mit Exit `2` abgelehnt.
+- Ein syntaktisch korrektes JSON-Dokument ist nicht zwangsläufig ein gültiges Schema. Root-Schema und geladene Referenzen werden jetzt gegen das mitgelieferte Draft-2020-12-Meta-Schema geprüft.
+- Die Pfadgrenze wird zusätzlich am tatsächlichen Ziel einer Dateiverknüpfung geprüft. Es gibt Tests für erlaubte und ausbrechende Verknüpfungen; auf Windows können sie bei fehlendem Symlink-Recht entfallen, auf Linux müssen sie laufen.
+- Der eingefrorene Report wird zusätzlich über die echte CLI mit englischer Systemeinstellung geprüft. Die Meldungssprache ist für v1 explizit Deutsch.
+- Ein nicht auflösbarer Verweis in einer nicht vorhandenen optionalen Eigenschaft wird ebenfalls als operativer Fehler erkannt.
+
+Statusvokabular, Reportfelder und Paketgrenzen bleiben erhalten. Die CLI ist für lokale, kontrollierte Eingaben gedacht; Ressourcenlimits und Schutz vor gleichzeitig manipulierten Dateien sind keine zugesicherte Eigenschaft dieser Iteration.
+
 ## Bewusst offen
 
 - Eine Lizenzdatei wird erst vor dem ersten öffentlichen Release festgelegt.

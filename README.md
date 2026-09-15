@@ -43,7 +43,7 @@ HTTP, SFTP, FTP, CSV, XML, YAML-specific syntax, semantic rules, and real counte
 
 The core uses project-owned result objects and ports. JSON parsing, schema validation, reporting, and future transports remain replaceable adapters.
 
-## Planned command shape
+## Command shape
 
 ```text
 zeus-interface-quality validate \
@@ -51,7 +51,15 @@ zeus-interface-quality validate \
   --input path/to/input.json
 ```
 
-The exact result contract is documented in `docs/decisions/0001-iteration-1.md` and will be kept independent of the transport used to start a validation run.
+The exact result contract is documented in `docs/contracts/validation-report-v1.md` and is independent of the transport used to start a validation run.
+
+## Input and schema checks
+
+Each file must contain exactly one JSON document. Empty files, trailing content, and duplicate object keys are operational errors (exit `2`). These checks also apply to referenced schema files. Schemas are checked against the bundled Draft 2020-12 meta-schema before use.
+
+Schema references are restricted to regular files inside the real directory of the selected root schema. Both normalized paths and resolved symlink targets are checked. References to remote hosts are rejected before retrieval. Use a controlled local schema directory; this CLI is not a sandbox for hostile inputs or concurrently modified files.
+
+Finding messages use German to preserve the published v1 example independently of the host locale. Automation should use `status`, paths, and `keyword`; message wording can change with a deliberate validator upgrade.
 
 ## Build
 

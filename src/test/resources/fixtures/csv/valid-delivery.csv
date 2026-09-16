@@ -1,0 +1,3 @@
+deliveryId;quantity;email
+DEL-1001;3;ops@example.org
+DEL-1002;12;"warehouse@example.org"

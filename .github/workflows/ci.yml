@@ -47,3 +47,39 @@ jobs:
             --input src/test/resources/fixtures/invalid-wrong-type.json
           exit_code=$?
           test "$exit_code" -eq 1
+
+      - name: Smoke test valid fixed-width fixture
+        run: >-
+          java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
+          --input-format fixed-width
+          --schema src/test/resources/fixtures/fixedwidth/delivery.cobol-profile.json
+          --input src/test/resources/fixtures/fixedwidth/valid-delivery.dat
+
+      - name: Smoke test invalid fixed-width fixture
+        shell: bash
+        run: |
+          set +e
+          java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
+            --input-format fixed-width \
+            --schema src/test/resources/fixtures/fixedwidth/delivery.cobol-profile.json \
+            --input src/test/resources/fixtures/fixedwidth/invalid-wrong-type.dat
+          exit_code=$?
+          test "$exit_code" -eq 1
+
+      - name: Smoke test valid CSV fixture
+        run: >-
+          java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
+          --input-format csv
+          --schema src/test/resources/fixtures/csv/delivery.csv-profile.json
+          --input src/test/resources/fixtures/csv/valid-delivery.csv
+
+      - name: Smoke test invalid CSV fixture
+        shell: bash
+        run: |
+          set +e
+          java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
+            --input-format csv \
+            --schema src/test/resources/fixtures/csv/delivery.csv-profile.json \
+            --input src/test/resources/fixtures/csv/invalid-wrong-type.csv
+          exit_code=$?
+          test "$exit_code" -eq 1

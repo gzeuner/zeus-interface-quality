@@ -1,0 +1,30 @@
+{
+  "format": "csv",
+  "version": 1,
+  "delimiter": ";",
+  "encoding": "UTF-8",
+  "header": [
+    "deliveryId",
+    "quantity",
+    "email"
+  ],
+  "columns": [
+    {
+      "name": "deliveryId",
+      "type": "string",
+      "required": true,
+      "minLength": 1
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "required": true,
+      "minimum": 1
+    },
+    {
+      "name": "email",
+      "type": "unsupported",
+      "required": true
+    }
+  ]
+}

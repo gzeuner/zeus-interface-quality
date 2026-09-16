@@ -6,7 +6,7 @@ The project accompanies the German [tiny-tool.de project page](https://tiny-tool
 
 ## Status
 
-Iteration 2b is complete.
+Iteration 2b is complete. Shared tabular checks and CLI auto-detection live on the improvements branch.
 
 The first iteration is deliberately small:
 
@@ -54,19 +54,23 @@ zeus-interface-quality validate \
 
 The exact result contract is documented in `docs/contracts/validation-report-v1.md` and is independent of the transport used to start a validation run.
 
---input-format json is the default and preserves the Iteration 1 behavior. With
---input-format csv, --schema points to a local CSV profile. Version 1 profiles
-define the encoding, one-character delimiter, exact header order, and column
-rules for strings, integers, decimals, e-mail addresses, required values,
-minimums, and regular expressions. Additional columns and malformed records are
-reported through the same VALID/INVALID result contract; syntactically kaputte
-CSV-Dateien bleiben technische Fehler mit Exit 2.
+`--input-format AUTO` is the default. The CLI reads the profile `format`
+field and selects JSON Schema, CSV, or fixed-width. Explicit
+`--input-format json|csv|fixed-width` still overrides detection.
+`--profile` is an alias for `--schema`.
 
-Fixed-width input uses --input-format fixed-width and a local profile with
-recordLength and one-based column positions. sourceLanguage may document
-COBOL, RPG, or another origin; it does not select a language-specific parser.
-The adapter measures positions in decoded characters and uses strict decoding
-for the configured character set.
+Version 1 CSV profiles define the encoding, one-character delimiter, exact
+header order, and column rules for strings, integers, decimals, e-mail
+addresses, required values, min/max length, min/max numeric bounds, and
+regular expressions. Additional columns and malformed records use the same
+VALID/INVALID result contract; syntactically broken CSV files remain
+operational errors with exit 2.
+
+Fixed-width input uses `--input-format fixed-width` or a profile with
+`format: fixed-width`. Profiles define `recordLength` and one-based column
+positions. `sourceLanguage` may document COBOL, RPG, or another origin; it
+does not select a language-specific parser. Positions are measured in decoded
+characters. An empty fixed-width file is INVALID (`minRecords`).
 
 ## Input and schema checks
 

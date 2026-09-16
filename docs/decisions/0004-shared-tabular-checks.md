@@ -1,6 +1,6 @@
 # ADR 0004: Gemeinsame Tabellenprüfungen
 
-Status: accepted for implementation
+Status: accepted
 
 ## Entscheidung
 

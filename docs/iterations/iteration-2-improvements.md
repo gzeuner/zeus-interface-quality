@@ -1,6 +1,6 @@
 # Iteration 2 improvements
 
-Status: in progress on `feature/iteration-2-csv-legacy-improvments`
+Status: complete; merged into `main` on 17 September 2026.
 
 ## Ziel
 
@@ -16,7 +16,9 @@ einzuführen.
 - CLI-Registry mit `--input-format AUTO` und Profilerkennung;
 - `--profile` als Alias für `--schema`;
 - Version aus dem JAR-Manifest statt hartcodierter Picocli-Version;
-- CI auch auf `feature/**`.
+- CI auch auf `feature/**`;
+- End-to-End-Tests für die AUTO-Erkennung und der Fallback bei ungültigem
+  Profil-JSON.
 
 ## Kompatibilität
 

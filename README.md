@@ -6,7 +6,7 @@ The project accompanies the German [tiny-tool.de project page](https://tiny-tool
 
 ## Status
 
-Iteration 2b is complete. Shared tabular checks and CLI auto-detection live on the improvements branch.
+Iteration 2b is complete. Shared tabular checks and CLI auto-detection are included in the current mainline.
 
 The first iteration is deliberately small:
 

@@ -38,4 +38,13 @@ class ValidatorRegistryTest {
         assertThat(registry.validatorFor(InputFormat.AUTO, csv))
                 .isInstanceOf(CsvValidator.class);
     }
+
+    @Test
+    void fallsBackToJsonForUnreadableProfileContent(@TempDir Path directory) throws Exception {
+        Path malformed = Files.writeString(directory.resolve("malformed.json"), "{");
+
+        assertThat(registry.detect(malformed)).isEqualTo(InputFormat.JSON);
+        assertThat(registry.validatorFor(InputFormat.AUTO, malformed))
+                .isInstanceOf(JsonSchemaValidator.class);
+    }
 }

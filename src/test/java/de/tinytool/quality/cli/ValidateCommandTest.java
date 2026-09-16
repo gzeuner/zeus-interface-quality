@@ -87,6 +87,22 @@ class ValidateCommandTest {
     }
 
     @Test
+    void autoDetectsCsvFromProfile() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--schema", fixture("csv/delivery.csv-profile.json").toString(),
+                "--input", fixture("csv/valid-delivery.csv").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).withFailMessage(errors::toString).isZero();
+        assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
+                .isEqualTo("VALID");
+    }
+
+    @Test
     void returnsZeroForValidFixedWidthInput() throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
@@ -118,6 +134,22 @@ class ValidateCommandTest {
         assertThat(exitCode).withFailMessage(errors::toString).isEqualTo(1);
         assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
                 .isEqualTo("INVALID");
+    }
+
+    @Test
+    void autoDetectsFixedWidthFromProfile() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--schema", fixture("fixedwidth/delivery.cobol-profile.json").toString(),
+                "--input", fixture("fixedwidth/valid-delivery.dat").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).withFailMessage(errors::toString).isZero();
+        assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
+                .isEqualTo("VALID");
     }
 
     @Test

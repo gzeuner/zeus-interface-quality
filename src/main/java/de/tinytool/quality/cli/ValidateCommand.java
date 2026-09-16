@@ -3,7 +3,6 @@ package de.tinytool.quality.cli;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
-import de.tinytool.quality.adapter.jsonschema.JsonSchemaValidator;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
@@ -32,10 +31,10 @@ import java.util.concurrent.Callable;
 public final class ValidateCommand implements Callable<Integer> {
 
     @Option(
-            names = "--schema",
+            names = {"--schema", "--profile"},
             required = true,
             paramLabel = "PATH",
-            description = "Path to the local JSON Schema or CSV profile."
+            description = "Path to the local JSON Schema or format profile."
     )
     private Path schema;
 
@@ -43,7 +42,7 @@ public final class ValidateCommand implements Callable<Integer> {
             names = "--input",
             required = true,
             paramLabel = "PATH",
-            description = "Path to the local JSON or CSV input."
+            description = "Path to the local JSON, CSV, or fixed-width input."
     )
     private Path input;
 
@@ -58,9 +57,9 @@ public final class ValidateCommand implements Callable<Integer> {
 
     @Option(
             names = "--input-format",
-            defaultValue = "JSON",
+            defaultValue = "AUTO",
             paramLabel = "FORMAT",
-            description = "Input format: JSON, CSV, or FIXED-WIDTH (default: JSON).",
+            description = "Input format: AUTO, JSON, CSV, or FIXED-WIDTH (default: AUTO).",
             converter = InputFormatConverter.class
     )
     private InputFormat inputFormat;
@@ -68,32 +67,28 @@ public final class ValidateCommand implements Callable<Integer> {
     @Spec
     private CommandSpec spec;
 
-    private final Validator jsonValidator;
-    private final Validator csvValidator;
-    private final Validator fixedWidthValidator;
+    private final ValidatorRegistry validators;
     private final JsonReportWriter jsonReportWriter;
     private final TextReportWriter textReportWriter;
 
     public ValidateCommand() {
-        this(new JsonSchemaValidator(), new CsvValidator(), new FixedWidthValidator());
+        this(new ValidatorRegistry());
     }
 
     ValidateCommand(Validator validator) {
-        this(validator, new CsvValidator(), new FixedWidthValidator());
+        this(new ValidatorRegistry(validator, new CsvValidator(), new FixedWidthValidator()));
     }
 
     ValidateCommand(Validator jsonValidator, Validator csvValidator) {
-        this(jsonValidator, csvValidator, new FixedWidthValidator());
+        this(new ValidatorRegistry(jsonValidator, csvValidator, new FixedWidthValidator()));
     }
 
-    ValidateCommand(
-            Validator jsonValidator,
-            Validator csvValidator,
-            Validator fixedWidthValidator
-    ) {
-        this.jsonValidator = jsonValidator;
-        this.csvValidator = csvValidator;
-        this.fixedWidthValidator = fixedWidthValidator;
+    ValidateCommand(Validator jsonValidator, Validator csvValidator, Validator fixedWidthValidator) {
+        this(new ValidatorRegistry(jsonValidator, csvValidator, fixedWidthValidator));
+    }
+
+    ValidateCommand(ValidatorRegistry validators) {
+        this.validators = validators;
         this.jsonReportWriter = new JsonReportWriter();
         this.textReportWriter = new TextReportWriter();
     }
@@ -104,7 +99,7 @@ public final class ValidateCommand implements Callable<Integer> {
         PrintWriter err = spec.commandLine().getErr();
 
         try {
-            ValidationResult result = validatorFor(inputFormat).validate(input, schema);
+            ValidationResult result = validators.validatorFor(inputFormat, schema).validate(input, schema);
             if (reportFormat == ReportFormat.JSON) {
                 out.println(jsonReportWriter.write(result));
             } else {
@@ -119,25 +114,11 @@ public final class ValidateCommand implements Callable<Integer> {
         }
     }
 
-    private Validator validatorFor(InputFormat format) {
-        return switch (format) {
-            case CSV -> csvValidator;
-            case FIXED_WIDTH -> fixedWidthValidator;
-            case JSON -> jsonValidator;
-        };
-    }
-
-    enum InputFormat {
-        JSON,
-        CSV,
-        FIXED_WIDTH
-    }
-
     static final class InputFormatConverter implements CommandLine.ITypeConverter<InputFormat> {
 
         @Override
         public InputFormat convert(String value) {
-            return InputFormat.valueOf(value.toUpperCase(Locale.ROOT).replace('-', '_'));
+            return InputFormat.fromCli(value);
         }
     }
 

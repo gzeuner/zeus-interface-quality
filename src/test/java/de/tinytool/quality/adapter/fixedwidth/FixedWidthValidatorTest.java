@@ -96,6 +96,30 @@ class FixedWidthValidatorTest {
                 .hasMessageContaining("must be ordered and must not overlap");
     }
 
+    @Test
+    void reportsEmptyInputAsInvalid(@TempDir Path directory) throws Exception {
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {
+                  "format": "fixed-width",
+                  "version": 1,
+                  "encoding": "UTF-8",
+                  "recordLength": 4,
+                  "columns": [
+                    {"name": "code", "start": 1, "length": 4, "type": "string", "required": true}
+                  ]
+                }
+                """);
+        Path input = Files.writeString(directory.resolve("input.dat"), "");
+
+        ValidationResult result = validator.validate(input, profile);
+
+        assertThat(result.findings()).containsExactly(new Finding(
+                "",
+                "/records",
+                "minRecords",
+                "Datei enthält keine Datensätze"));
+    }
+
     private static Path fixture(String name) {
         try {
             return Path.of(Objects.requireNonNull(

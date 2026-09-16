@@ -1,0 +1,40 @@
+{
+  "format": "fixed-width",
+  "version": 1,
+  "encoding": "UTF-8",
+  "recordLength": 31,
+  "sourceLanguage": "RPG",
+  "columns": [
+    {
+      "name": "recordType",
+      "start": 1,
+      "length": 1,
+      "type": "string",
+      "required": true,
+      "pattern": "^D$"
+    },
+    {
+      "name": "deliveryId",
+      "start": 2,
+      "length": 10,
+      "type": "string",
+      "required": true,
+      "minLength": 1
+    },
+    {
+      "name": "quantity",
+      "start": 12,
+      "length": 5,
+      "type": "integer",
+      "required": true,
+      "minimum": 1
+    },
+    {
+      "name": "email",
+      "start": 17,
+      "length": 15,
+      "type": "email",
+      "required": true
+    }
+  ]
+}

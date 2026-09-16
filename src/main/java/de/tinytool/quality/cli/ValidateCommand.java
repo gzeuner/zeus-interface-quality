@@ -1,6 +1,8 @@
 package de.tinytool.quality.cli;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import de.tinytool.quality.adapter.csv.CsvValidator;
+import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
 import de.tinytool.quality.adapter.jsonschema.JsonSchemaValidator;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
@@ -20,12 +22,12 @@ import java.util.Locale;
 import java.util.concurrent.Callable;
 
 /**
- * Validates one local JSON document against one local JSON Schema.
+ * Validates one local input document against a format-specific local profile.
  */
 @Command(
         name = "validate",
         mixinStandardHelpOptions = true,
-        description = "Validate a local JSON document against a local JSON Schema."
+        description = "Validate a local JSON, CSV, or fixed-width input against a local profile."
 )
 public final class ValidateCommand implements Callable<Integer> {
 
@@ -33,7 +35,7 @@ public final class ValidateCommand implements Callable<Integer> {
             names = "--schema",
             required = true,
             paramLabel = "PATH",
-            description = "Path to the local JSON Schema."
+            description = "Path to the local JSON Schema or CSV profile."
     )
     private Path schema;
 
@@ -41,7 +43,7 @@ public final class ValidateCommand implements Callable<Integer> {
             names = "--input",
             required = true,
             paramLabel = "PATH",
-            description = "Path to the local JSON document."
+            description = "Path to the local JSON or CSV input."
     )
     private Path input;
 
@@ -49,24 +51,49 @@ public final class ValidateCommand implements Callable<Integer> {
             names = "--report",
             defaultValue = "TEXT",
             paramLabel = "FORMAT",
-            description = "Report format: ${COMPLETION-CANDIDATES} (default: ${DEFAULT-VALUE}).",
+            description = "Report format: TEXT or JSON (default: TEXT).",
             converter = ReportFormatConverter.class
     )
     private ReportFormat reportFormat;
 
+    @Option(
+            names = "--input-format",
+            defaultValue = "JSON",
+            paramLabel = "FORMAT",
+            description = "Input format: JSON, CSV, or FIXED-WIDTH (default: JSON).",
+            converter = InputFormatConverter.class
+    )
+    private InputFormat inputFormat;
+
     @Spec
     private CommandSpec spec;
 
-    private final Validator validator;
+    private final Validator jsonValidator;
+    private final Validator csvValidator;
+    private final Validator fixedWidthValidator;
     private final JsonReportWriter jsonReportWriter;
     private final TextReportWriter textReportWriter;
 
     public ValidateCommand() {
-        this(new JsonSchemaValidator());
+        this(new JsonSchemaValidator(), new CsvValidator(), new FixedWidthValidator());
     }
 
     ValidateCommand(Validator validator) {
-        this.validator = validator;
+        this(validator, new CsvValidator(), new FixedWidthValidator());
+    }
+
+    ValidateCommand(Validator jsonValidator, Validator csvValidator) {
+        this(jsonValidator, csvValidator, new FixedWidthValidator());
+    }
+
+    ValidateCommand(
+            Validator jsonValidator,
+            Validator csvValidator,
+            Validator fixedWidthValidator
+    ) {
+        this.jsonValidator = jsonValidator;
+        this.csvValidator = csvValidator;
+        this.fixedWidthValidator = fixedWidthValidator;
         this.jsonReportWriter = new JsonReportWriter();
         this.textReportWriter = new TextReportWriter();
     }
@@ -77,7 +104,7 @@ public final class ValidateCommand implements Callable<Integer> {
         PrintWriter err = spec.commandLine().getErr();
 
         try {
-            ValidationResult result = validator.validate(input, schema);
+            ValidationResult result = validatorFor(inputFormat).validate(input, schema);
             if (reportFormat == ReportFormat.JSON) {
                 out.println(jsonReportWriter.write(result));
             } else {
@@ -89,6 +116,28 @@ public final class ValidateCommand implements Callable<Integer> {
             err.println("ERROR: " + e.getMessage());
             err.flush();
             return 2;
+        }
+    }
+
+    private Validator validatorFor(InputFormat format) {
+        return switch (format) {
+            case CSV -> csvValidator;
+            case FIXED_WIDTH -> fixedWidthValidator;
+            case JSON -> jsonValidator;
+        };
+    }
+
+    enum InputFormat {
+        JSON,
+        CSV,
+        FIXED_WIDTH
+    }
+
+    static final class InputFormatConverter implements CommandLine.ITypeConverter<InputFormat> {
+
+        @Override
+        public InputFormat convert(String value) {
+            return InputFormat.valueOf(value.toUpperCase(Locale.ROOT).replace('-', '_'));
         }
     }
 

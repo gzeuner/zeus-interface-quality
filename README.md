@@ -6,7 +6,7 @@ The project accompanies the German [tiny-tool.de project page](https://tiny-tool
 
 ## Status
 
-Iteration 1 is complete.
+Iteration 2b is complete.
 
 The first iteration is deliberately small:
 
@@ -28,7 +28,7 @@ java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
 
 Exit codes are deterministic: `0` means valid, `1` means validation failed, and `2` means an operational or command error. The JSON report contract is documented in [`docs/contracts/validation-report-v1.md`](docs/contracts/validation-report-v1.md); an invalid example is available at [`docs/examples/validation-report-invalid-wrong-type.json`](docs/examples/validation-report-invalid-wrong-type.json).
 
-HTTP, SFTP, FTP, CSV, XML, YAML-specific syntax, semantic rules, and real counterpart systems are intentionally out of scope for this iteration.
+HTTP, SFTP, FTP, XML, YAML-specific syntax, semantic rules, and real counterpart systems remain intentionally out of scope for this iteration.
 
 ## Technology baseline
 
@@ -37,6 +37,7 @@ HTTP, SFTP, FTP, CSV, XML, YAML-specific syntax, semantic rules, and real counte
 - one Maven module for the first iteration;
 - Jackson 2.x for JSON data handling;
 - NetworkNT JSON Schema Validator 2.x for JSON Schema Draft 2020-12;
+- Apache Commons CSV 1.14.1 for quoted, delimited text parsing;
 - Picocli for the command-line interface;
 - JUnit and AssertJ for tests;
 - no Spring Boot dependency in the core or CLI.
@@ -53,6 +54,20 @@ zeus-interface-quality validate \
 
 The exact result contract is documented in `docs/contracts/validation-report-v1.md` and is independent of the transport used to start a validation run.
 
+--input-format json is the default and preserves the Iteration 1 behavior. With
+--input-format csv, --schema points to a local CSV profile. Version 1 profiles
+define the encoding, one-character delimiter, exact header order, and column
+rules for strings, integers, decimals, e-mail addresses, required values,
+minimums, and regular expressions. Additional columns and malformed records are
+reported through the same VALID/INVALID result contract; syntactically kaputte
+CSV-Dateien bleiben technische Fehler mit Exit 2.
+
+Fixed-width input uses --input-format fixed-width and a local profile with
+recordLength and one-based column positions. sourceLanguage may document
+COBOL, RPG, or another origin; it does not select a language-specific parser.
+The adapter measures positions in decoded characters and uses strict decoding
+for the configured character set.
+
 ## Input and schema checks
 
 Each file must contain exactly one JSON document. Empty files, trailing content, and duplicate object keys are operational errors (exit `2`). These checks also apply to referenced schema files. Schemas are checked against the bundled Draft 2020-12 meta-schema before use.
@@ -60,6 +75,16 @@ Each file must contain exactly one JSON document. Empty files, trailing content,
 Schema references are restricted to regular files inside the real directory of the selected root schema. Both normalized paths and resolved symlink targets are checked. References to remote hosts are rejected before retrieval. Use a controlled local schema directory; this CLI is not a sandbox for hostile inputs or concurrently modified files.
 
 Finding messages use German to preserve the published v1 example independently of the host locale. Automation should use `status`, paths, and `keyword`; message wording can change with a deliberate validator upgrade.
+
+CSV profiles are deliberately a small adapter contract, not a replacement for
+JSON Schema. The profile format can evolve independently, and future adapters
+can use their own native schemas while returning the same project-owned result
+objects.
+
+The fixed-width profile is likewise an adapter-specific contract. It makes
+legacy layout assumptions explicit without pretending to parse COBOL- or
+RPG-Quelltexte. DDL-to-profile generation, transport access, and fachliche
+Mehrdatei-Regeln remain topics for later iterations.
 
 ## Build
 

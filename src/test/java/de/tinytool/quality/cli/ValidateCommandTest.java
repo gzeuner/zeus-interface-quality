@@ -53,6 +53,92 @@ class ValidateCommandTest {
     }
 
     @Test
+    void returnsZeroForValidCsvAndWritesJsonReport() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--input-format", "csv",
+                "--schema", fixture("csv/delivery.csv-profile.json").toString(),
+                "--input", fixture("csv/valid-delivery.csv").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).withFailMessage(errors::toString).isZero();
+        assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
+                .isEqualTo("VALID");
+    }
+
+    @Test
+    void returnsOneForInvalidCsv() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--input-format", "csv",
+                "--schema", fixture("csv/delivery.csv-profile.json").toString(),
+                "--input", fixture("csv/invalid-wrong-type.csv").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).withFailMessage(errors::toString).isEqualTo(1);
+        assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
+                .isEqualTo("INVALID");
+    }
+
+    @Test
+    void returnsZeroForValidFixedWidthInput() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--input-format", "fixed-width",
+                "--schema", fixture("fixedwidth/delivery.cobol-profile.json").toString(),
+                "--input", fixture("fixedwidth/valid-delivery.dat").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).withFailMessage(errors::toString).isZero();
+        assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
+                .isEqualTo("VALID");
+    }
+
+    @Test
+    void returnsOneForInvalidFixedWidthInput() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--input-format", "fixed-width",
+                "--schema", fixture("fixedwidth/delivery.cobol-profile.json").toString(),
+                "--input", fixture("fixedwidth/invalid-wrong-type.dat").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).withFailMessage(errors::toString).isEqualTo(1);
+        assertThat(new ObjectMapper().readTree(output.toString()).get("status").asText())
+                .isEqualTo("INVALID");
+    }
+
+    @Test
+    void returnsTwoForMalformedCsvWithoutPrintingAReport() throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        CommandLine commandLine = commandLine(output, errors);
+
+        int exitCode = commandLine.execute(
+                "--input-format", "csv",
+                "--schema", fixture("csv/delivery.csv-profile.json").toString(),
+                "--input", fixture("csv/malformed.csv").toString(),
+                "--report", "json");
+
+        assertThat(exitCode).isEqualTo(2);
+        assertThat(output.toString()).isEmpty();
+        assertThat(errors.toString()).startsWith("ERROR:")
+                .doesNotContain("\tat ");
+    }
+
+    @Test
     void actualReportMatchesFrozenExampleOnAnEnglishHost() throws Exception {
         Locale previous = Locale.getDefault();
         try {

@@ -95,7 +95,7 @@ class CsvValidatorTest {
                 fixture("valid-delivery.csv"),
                 fixture("invalid-profile.json")))
                 .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("Unsupported CSV column type");
+                .hasMessageContaining("Unsupported column type");
     }
 
     @Test
@@ -122,6 +122,32 @@ class CsvValidatorTest {
 
         assertThat(result.findings()).extracting(Finding::keyword)
                 .containsExactly("minimum", "pattern");
+    }
+
+    @Test
+    void reportsMaximumAndMaxLength(@TempDir Path directory) throws Exception {
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {
+                  "format": "csv",
+                  "version": 1,
+                  "delimiter": ",",
+                  "encoding": "UTF-8",
+                  "header": ["code", "amount"],
+                  "columns": [
+                    {"name": "code", "type": "string", "required": true, "maxLength": 3},
+                    {"name": "amount", "type": "decimal", "required": true, "maximum": 10.5}
+                  ]
+                }
+                """);
+        Path input = Files.writeString(directory.resolve("input.csv"), """
+                code,amount
+                ABCD,10.6
+                """);
+
+        ValidationResult result = validator.validate(input, profile);
+
+        assertThat(result.findings()).extracting(Finding::keyword)
+                .containsExactly("maximum", "maxLength");
     }
 
     private static Path fixture(String name) {

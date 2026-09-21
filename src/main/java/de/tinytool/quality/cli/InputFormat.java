@@ -9,7 +9,8 @@ public enum InputFormat {
     AUTO,
     JSON,
     CSV,
-    FIXED_WIDTH;
+    FIXED_WIDTH,
+    HTTP;
 
     public static InputFormat fromCli(String value) {
         return InputFormat.valueOf(value.toUpperCase(Locale.ROOT).replace('-', '_'));

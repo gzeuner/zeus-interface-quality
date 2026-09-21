@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
+import de.tinytool.quality.adapter.http.HttpValidator;
 import de.tinytool.quality.adapter.jsonschema.JsonSchemaValidator;
 import de.tinytool.quality.core.Validator;
 
@@ -20,14 +21,24 @@ public final class ValidatorRegistry {
     private final ObjectMapper objectMapper;
 
     public ValidatorRegistry() {
-        this(new JsonSchemaValidator(), new CsvValidator(), new FixedWidthValidator());
+        this(new JsonSchemaValidator(), new CsvValidator(), new FixedWidthValidator(), new HttpValidator());
     }
 
     public ValidatorRegistry(Validator jsonValidator, Validator csvValidator, Validator fixedWidthValidator) {
+        this(jsonValidator, csvValidator, fixedWidthValidator, new HttpValidator());
+    }
+
+    public ValidatorRegistry(
+            Validator jsonValidator,
+            Validator csvValidator,
+            Validator fixedWidthValidator,
+            Validator httpValidator
+    ) {
         Map<InputFormat, Validator> map = new EnumMap<>(InputFormat.class);
         map.put(InputFormat.JSON, jsonValidator);
         map.put(InputFormat.CSV, csvValidator);
         map.put(InputFormat.FIXED_WIDTH, fixedWidthValidator);
+        map.put(InputFormat.HTTP, httpValidator);
         this.validators = Map.copyOf(map);
         this.objectMapper = new ObjectMapper();
     }
@@ -56,6 +67,9 @@ public final class ValidatorRegistry {
                 }
                 if ("fixed-width".equals(format)) {
                     return InputFormat.FIXED_WIDTH;
+                }
+                if ("http".equals(format)) {
+                    return InputFormat.HTTP;
                 }
             }
         } catch (Exception ignored) {

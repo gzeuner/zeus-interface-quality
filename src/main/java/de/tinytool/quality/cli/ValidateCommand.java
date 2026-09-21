@@ -3,6 +3,7 @@ package de.tinytool.quality.cli;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
+import de.tinytool.quality.adapter.http.HttpValidator;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
@@ -26,7 +27,7 @@ import java.util.concurrent.Callable;
 @Command(
         name = "validate",
         mixinStandardHelpOptions = true,
-        description = "Validate a local JSON, CSV, or fixed-width input against a local profile."
+        description = "Validate a local JSON, CSV, fixed-width, or HTTP exchange against a local profile."
 )
 public final class ValidateCommand implements Callable<Integer> {
 
@@ -40,9 +41,8 @@ public final class ValidateCommand implements Callable<Integer> {
 
     @Option(
             names = "--input",
-            required = true,
             paramLabel = "PATH",
-            description = "Path to the local JSON, CSV, or fixed-width input."
+            description = "Path to the local JSON, CSV, fixed-width, or optional HTTP request body."
     )
     private Path input;
 
@@ -59,7 +59,7 @@ public final class ValidateCommand implements Callable<Integer> {
             names = "--input-format",
             defaultValue = "AUTO",
             paramLabel = "FORMAT",
-            description = "Input format: AUTO, JSON, CSV, or FIXED-WIDTH (default: AUTO).",
+            description = "Input format: AUTO, JSON, CSV, FIXED-WIDTH, or HTTP (default: AUTO).",
             converter = InputFormatConverter.class
     )
     private InputFormat inputFormat;
@@ -84,7 +84,7 @@ public final class ValidateCommand implements Callable<Integer> {
     }
 
     ValidateCommand(Validator jsonValidator, Validator csvValidator, Validator fixedWidthValidator) {
-        this(new ValidatorRegistry(jsonValidator, csvValidator, fixedWidthValidator));
+        this(new ValidatorRegistry(jsonValidator, csvValidator, fixedWidthValidator, new HttpValidator()));
     }
 
     ValidateCommand(ValidatorRegistry validators) {

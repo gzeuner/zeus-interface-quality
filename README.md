@@ -6,7 +6,7 @@ The project accompanies the German [tiny-tool.de project page](https://tiny-tool
 
 ## Status
 
-Iteration 2b is complete. Shared tabular checks and CLI auto-detection are included in the current mainline.
+Iteration 3 is complete. The current mainline validates local JSON, CSV, fixed-width, and HTTP exchanges with one shared result contract.
 
 The first iteration is deliberately small:
 
@@ -28,7 +28,7 @@ java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
 
 Exit codes are deterministic: `0` means valid, `1` means validation failed, and `2` means an operational or command error. The JSON report contract is documented in [`docs/contracts/validation-report-v1.md`](docs/contracts/validation-report-v1.md); an invalid example is available at [`docs/examples/validation-report-invalid-wrong-type.json`](docs/examples/validation-report-invalid-wrong-type.json).
 
-HTTP, SFTP, FTP, XML, YAML-specific syntax, semantic rules, and real counterpart systems remain intentionally out of scope for this iteration.
+SFTP, FTP, XML, YAML-specific syntax, semantic rules, and real counterpart systems remain intentionally out of scope for this iteration.
 
 ## Technology baseline
 
@@ -38,6 +38,7 @@ HTTP, SFTP, FTP, XML, YAML-specific syntax, semantic rules, and real counterpart
 - Jackson 2.x for JSON data handling;
 - NetworkNT JSON Schema Validator 2.x for JSON Schema Draft 2020-12;
 - Apache Commons CSV 1.14.1 for quoted, delimited text parsing;
+- JDK `java.net.http.HttpClient` for the bounded HTTP adapter;
 - Picocli for the command-line interface;
 - JUnit and AssertJ for tests;
 - no Spring Boot dependency in the core or CLI.
@@ -55,8 +56,8 @@ zeus-interface-quality validate \
 The exact result contract is documented in `docs/contracts/validation-report-v1.md` and is independent of the transport used to start a validation run.
 
 `--input-format AUTO` is the default. The CLI reads the profile `format`
-field and selects JSON Schema, CSV, or fixed-width. Explicit
-`--input-format json|csv|fixed-width` still overrides detection.
+field and selects JSON Schema, CSV, fixed-width, or HTTP. Explicit
+`--input-format json|csv|fixed-width|http` still overrides detection.
 `--profile` is an alias for `--schema`.
 
 Version 1 CSV profiles define the encoding, one-character delimiter, exact
@@ -89,6 +90,16 @@ The fixed-width profile is likewise an adapter-specific contract. It makes
 legacy layout assumptions explicit without pretending to parse COBOL- or
 RPG-Quelltexte. DDL-to-profile generation, transport access, and fachliche
 Mehrdatei-Regeln remain topics for later iterations.
+
+HTTP profiles combine a local JSON request schema, an HTTP method and URL,
+an expected response status, optional response-header requirements, and a
+local JSON response schema. The request body is validated before the network
+call. A response with the wrong status, headers, or body is `INVALID`; a
+timeout, connection failure, malformed profile, or malformed request is an
+operational error with exit code `2`. Redirects are not followed and all
+schema references remain local to the profile directory. See
+[`docs/contracts/http-profile-v1.md`](docs/contracts/http-profile-v1.md) and
+[`docs/iterations/iteration-3-http.md`](docs/iterations/iteration-3-http.md).
 
 ## Build
 

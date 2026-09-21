@@ -51,10 +51,32 @@ public final class JsonSchemaValidator implements Validator {
     public ValidationResult validate(Path input, Path schema) throws ValidationException {
         Path inputFile = requireRegularFile(input, "Input document");
         Path schemaFile = requireRegularFile(schema, "Schema");
-        Path schemaDirectory = schemaFile.getParent();
 
         try {
             JsonNode inputNode = requireDocument(objectMapper.readTree(inputFile.toFile()));
+            return validateNode(inputNode, schemaFile);
+        } catch (IOException e) {
+            throw new ValidationException("Could not read JSON input or schema: " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            throw new ValidationException("Could not prepare JSON Schema validation: " + safeMessage(e), e);
+        }
+    }
+
+    /**
+     * Validates an already parsed JSON value against a local schema.
+     *
+     * <p>This keeps the HTTP adapter from writing response bodies to temporary
+     * files while reusing the exact same schema and report semantics as the
+     * local JSON adapter.</p>
+     */
+    public ValidationResult validateNode(JsonNode inputNode, Path schema) throws ValidationException {
+        if (inputNode == null) {
+            throw new ValidationException("JSON input node is required");
+        }
+        Path schemaFile = requireRegularFile(schema, "Schema");
+        Path schemaDirectory = schemaFile.getParent();
+
+        try {
             // Meta-schemas are bundled in NetworkNT. This registry has no remote fetcher.
             Schema metaSchema = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
                     .getSchema(SchemaLocation.of(SpecificationVersion.DRAFT_2020_12.getDialectId()));
@@ -76,7 +98,7 @@ public final class JsonSchemaValidator implements Validator {
                     .map(JsonSchemaValidator::toFinding)
                     .toList());
         } catch (IOException e) {
-            throw new ValidationException("Could not read JSON input or schema: " + e.getMessage(), e);
+            throw new ValidationException("Could not read JSON schema: " + e.getMessage(), e);
         } catch (RuntimeException e) {
             throw new ValidationException("Could not prepare JSON Schema validation: " + safeMessage(e), e);
         }

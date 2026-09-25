@@ -1,0 +1,19 @@
+{
+  "format": "sftp",
+  "version": 1,
+  "host": "sftp.example.org",
+  "port": 22,
+  "username": "quality-check",
+  "remotePath": "/inbox/delivery.json",
+  "knownHosts": "known_hosts",
+  "privateKey": "id_ed25519",
+  "privateKeyPassphraseEnv": "SFTP_KEY_PASSPHRASE",
+  "contentFormat": "json",
+  "contentProfile": "delivery.schema.json",
+  "quarantineRemoteDirectory": "/quarantine",
+  "stabilityChecks": 2,
+  "stabilityDelaySeconds": 1,
+  "maxAttempts": 2,
+  "retryDelaySeconds": 1,
+  "connectTimeoutSeconds": 10
+}

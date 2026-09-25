@@ -20,15 +20,17 @@ class ValidatorRegistryTest {
             new FixedWidthValidator());
 
     @Test
-    void detectsCsvFixedWidthAndHttpFromProfileFormat(@TempDir Path directory) throws Exception {
+    void detectsCsvFixedWidthHttpAndSftpFromProfileFormat(@TempDir Path directory) throws Exception {
         Path csv = Files.writeString(directory.resolve("csv.json"), "{\"format\":\"csv\"}");
         Path fixed = Files.writeString(directory.resolve("fw.json"), "{\"format\":\"fixed-width\"}");
         Path http = Files.writeString(directory.resolve("http.json"), "{\"format\":\"http\"}");
+        Path sftp = Files.writeString(directory.resolve("sftp.json"), "{\"format\":\"sftp\"}");
         Path json = Files.writeString(directory.resolve("schema.json"), "{\"type\":\"object\"}");
 
         assertThat(registry.detect(csv)).isEqualTo(InputFormat.CSV);
         assertThat(registry.detect(fixed)).isEqualTo(InputFormat.FIXED_WIDTH);
         assertThat(registry.detect(http)).isEqualTo(InputFormat.HTTP);
+        assertThat(registry.detect(sftp)).isEqualTo(InputFormat.SFTP);
         assertThat(registry.detect(json)).isEqualTo(InputFormat.JSON);
     }
 
@@ -42,6 +44,8 @@ class ValidatorRegistryTest {
                 .isInstanceOf(CsvValidator.class);
         assertThat(registry.validatorFor(InputFormat.HTTP, csv))
                 .isInstanceOf(HttpValidator.class);
+        assertThat(registry.validatorFor(InputFormat.SFTP, csv))
+                .isInstanceOf(de.tinytool.quality.adapter.sftp.SftpValidator.class);
     }
 
     @Test

@@ -10,7 +10,8 @@ public enum InputFormat {
     JSON,
     CSV,
     FIXED_WIDTH,
-    HTTP;
+    HTTP,
+    SFTP;
 
     public static InputFormat fromCli(String value) {
         return InputFormat.valueOf(value.toUpperCase(Locale.ROOT).replace('-', '_'));

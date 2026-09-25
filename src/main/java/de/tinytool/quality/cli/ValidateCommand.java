@@ -27,7 +27,7 @@ import java.util.concurrent.Callable;
 @Command(
         name = "validate",
         mixinStandardHelpOptions = true,
-        description = "Validate a local JSON, CSV, fixed-width, or HTTP exchange against a local profile."
+        description = "Validate a local JSON, CSV, fixed-width, HTTP, or SFTP exchange against a local profile."
 )
 public final class ValidateCommand implements Callable<Integer> {
 
@@ -59,7 +59,7 @@ public final class ValidateCommand implements Callable<Integer> {
             names = "--input-format",
             defaultValue = "AUTO",
             paramLabel = "FORMAT",
-            description = "Input format: AUTO, JSON, CSV, FIXED-WIDTH, or HTTP (default: AUTO).",
+            description = "Input format: AUTO, JSON, CSV, FIXED-WIDTH, HTTP, or SFTP (default: AUTO).",
             converter = InputFormatConverter.class
     )
     private InputFormat inputFormat;

@@ -6,6 +6,7 @@ import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
 import de.tinytool.quality.adapter.http.HttpValidator;
 import de.tinytool.quality.adapter.jsonschema.JsonSchemaValidator;
+import de.tinytool.quality.adapter.sftp.SftpValidator;
 import de.tinytool.quality.core.Validator;
 
 import java.nio.file.Path;
@@ -21,7 +22,8 @@ public final class ValidatorRegistry {
     private final ObjectMapper objectMapper;
 
     public ValidatorRegistry() {
-        this(new JsonSchemaValidator(), new CsvValidator(), new FixedWidthValidator(), new HttpValidator());
+        this(new JsonSchemaValidator(), new CsvValidator(), new FixedWidthValidator(),
+                new HttpValidator(), new SftpValidator());
     }
 
     public ValidatorRegistry(Validator jsonValidator, Validator csvValidator, Validator fixedWidthValidator) {
@@ -34,11 +36,22 @@ public final class ValidatorRegistry {
             Validator fixedWidthValidator,
             Validator httpValidator
     ) {
+        this(jsonValidator, csvValidator, fixedWidthValidator, httpValidator, new SftpValidator());
+    }
+
+    public ValidatorRegistry(
+            Validator jsonValidator,
+            Validator csvValidator,
+            Validator fixedWidthValidator,
+            Validator httpValidator,
+            Validator sftpValidator
+    ) {
         Map<InputFormat, Validator> map = new EnumMap<>(InputFormat.class);
         map.put(InputFormat.JSON, jsonValidator);
         map.put(InputFormat.CSV, csvValidator);
         map.put(InputFormat.FIXED_WIDTH, fixedWidthValidator);
         map.put(InputFormat.HTTP, httpValidator);
+        map.put(InputFormat.SFTP, sftpValidator);
         this.validators = Map.copyOf(map);
         this.objectMapper = new ObjectMapper();
     }
@@ -70,6 +83,9 @@ public final class ValidatorRegistry {
                 }
                 if ("http".equals(format)) {
                     return InputFormat.HTTP;
+                }
+                if ("sftp".equals(format)) {
+                    return InputFormat.SFTP;
                 }
             }
         } catch (Exception ignored) {

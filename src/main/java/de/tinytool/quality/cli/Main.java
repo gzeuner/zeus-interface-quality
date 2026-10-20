@@ -1,3 +1,11 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.cli;
 
 import picocli.CommandLine;
@@ -12,7 +20,7 @@ import picocli.CommandLine.IVersionProvider;
         mixinStandardHelpOptions = true,
         versionProvider = Main.ManifestVersionProvider.class,
         description = "Technology-agnostic interface quality tool.",
-        subcommands = ValidateCommand.class
+        subcommands = {ValidateCommand.class, GuiCommand.class}
 )
 public final class Main implements Runnable {
 

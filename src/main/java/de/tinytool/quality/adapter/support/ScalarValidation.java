@@ -1,8 +1,21 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.adapter.support;
 
 import de.tinytool.quality.core.Finding;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
+import java.time.temporal.ChronoField;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -12,7 +25,14 @@ import java.util.regex.Pattern;
 public final class ScalarValidation {
 
     private static final Pattern INTEGER = Pattern.compile("[+-]?\\d+");
+    private static final Pattern DECIMAL_COMMA = Pattern.compile("[+-]?(?:\\d+(?:,\\d+)?|,\\d+)");
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
+    private static final DateTimeFormatter ISO_TIME_MINUTE = new java.time.format.DateTimeFormatterBuilder()
+            .appendValue(ChronoField.HOUR_OF_DAY, 2)
+            .appendLiteral(':')
+            .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+            .toFormatter()
+            .withResolverStyle(ResolverStyle.STRICT);
 
     private ScalarValidation() {
     }
@@ -25,6 +45,20 @@ public final class ScalarValidation {
             ScalarRules rules,
             String instancePath,
             String schemaPath,
+            List<Finding> findings
+    ) {
+        validateField(rawValue, recordNumber, columnName, type, rules, instancePath, schemaPath, '.', findings);
+    }
+
+    public static void validateField(
+            String rawValue,
+            long recordNumber,
+            String columnName,
+            ScalarType type,
+            ScalarRules rules,
+            String instancePath,
+            String schemaPath,
+            char decimalSeparator,
             List<Finding> findings
     ) {
         String value = rawValue == null ? "" : rawValue;
@@ -71,13 +105,41 @@ public final class ScalarValidation {
             }
             case DECIMAL -> {
                 try {
-                    addNumericBounds(new BigDecimal(value), rules, prefix, instancePath, schemaPath, findings);
+                    addNumericBounds(
+                            parseDecimal(value, decimalSeparator),
+                            rules,
+                            prefix,
+                            instancePath,
+                            schemaPath,
+                            findings);
                 } catch (NumberFormatException e) {
                     findings.add(new Finding(
                             instancePath,
                             schemaPath + "/type",
                             "type",
                             prefix + "'" + value + "' ist keine Dezimalzahl"));
+                }
+            }
+            case DATE -> {
+                try {
+                    LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE);
+                } catch (java.time.format.DateTimeParseException e) {
+                    findings.add(new Finding(
+                            instancePath,
+                            schemaPath + "/type",
+                            "type",
+                            prefix + "'" + value + "' ist kein gültiges Datum im Format JJJJ-MM-TT"));
+                }
+            }
+            case TIME -> {
+                try {
+                    LocalTime.parse(value, ISO_TIME_MINUTE);
+                } catch (java.time.format.DateTimeParseException e) {
+                    findings.add(new Finding(
+                            instancePath,
+                            schemaPath + "/type",
+                            "type",
+                            prefix + "'" + value + "' ist keine gültige Uhrzeit im Format HH:mm"));
                 }
             }
             case EMAIL -> {
@@ -98,6 +160,24 @@ public final class ScalarValidation {
                     "pattern",
                     prefix + "entspricht nicht dem vorgegebenen Muster"));
         }
+    }
+
+    private static BigDecimal parseDecimal(String value, char decimalSeparator) {
+        if (decimalSeparator == '.') {
+            return new BigDecimal(value);
+        }
+        if (!DECIMAL_COMMA.matcher(value).matches()) {
+            throw new NumberFormatException("Value does not use the configured decimal separator");
+        }
+        String normalized = value.replace(',', '.');
+        if (normalized.startsWith(".")) {
+            normalized = "0" + normalized;
+        } else if (normalized.startsWith("-.")) {
+            normalized = "-0" + normalized.substring(1);
+        } else if (normalized.startsWith("+.")) {
+            normalized = "+0" + normalized.substring(1);
+        }
+        return new BigDecimal(normalized);
     }
 
     private static void addNumericBounds(

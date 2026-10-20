@@ -1,5 +1,13 @@
 # SFTP profile contract v1
 
+[English](sftp-profile-v1.md) | [Deutsch](sftp-profile-v1.de.md)
+
+This adapter is CLI-only: the desktop GUI and `validate --local-only` reject
+SFTP profiles before transport access. Local POS validation does not need it.
+Do not use production SFTP for this workflow; transport checks may use an
+explicitly configured temporary test instance. Opt-in quarantine changes
+remote state.
+
 Iteration 4 validates exactly one remote SFTP file. The profile is a local
 JSON document and is selected with `--schema` or `--profile`:
 
@@ -61,11 +69,10 @@ contract so that selection and side effects stay explicit.
 
 ## Command and result semantics
 
-```text
-java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
-  --input-format sftp \
-  --schema path/to/sftp-profile.json \
-  --report json
+Windows PowerShell, only for a configured temporary test instance:
+
+```powershell
+java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --input-format sftp --profile .\test-sftp\sftp-profile.json --report json
 ```
 
 Do not pass `--input`: the profile supplies the remote file. A valid remote

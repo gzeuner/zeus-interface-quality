@@ -1,3 +1,6 @@
+# Author: tiny-tool.de
+# Copyright 2026 tiny-tool.de
+# SPDX-License-Identifier: Apache-2.0
 name: CI
 
 on:
@@ -27,6 +30,11 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Check POSIX GUI launcher
+        run: |
+          sh -n start-gui.sh
+          test -x start-gui.sh
+
       - name: Run tests
         run: ./mvnw -B test
 
@@ -47,7 +55,7 @@ jobs:
             --schema src/test/resources/fixtures/delivery.schema.json \
             --input src/test/resources/fixtures/invalid-wrong-type.json
           exit_code=$?
-          test "$exit_code" -eq 1
+          test "$exit_code" -eq 1 || exit 1
 
       - name: Smoke test valid fixed-width fixture
         run: >-
@@ -65,22 +73,24 @@ jobs:
             --schema src/test/resources/fixtures/fixedwidth/delivery.cobol-profile.json \
             --input src/test/resources/fixtures/fixedwidth/invalid-wrong-type.dat
           exit_code=$?
-          test "$exit_code" -eq 1
+          test "$exit_code" -eq 1 || exit 1
 
       - name: Smoke test valid CSV fixture
         run: >-
           java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
-          --input-format csv
-          --schema src/test/resources/fixtures/csv/delivery.csv-profile.json
-          --input src/test/resources/fixtures/csv/valid-delivery.csv
+          --profile docs/examples/fictional-bicycle-rentals.csv-profile.json
+          --input docs/examples/fictional-bicycle-rentals.csv
+          --local-only
 
       - name: Smoke test invalid CSV fixture
         shell: bash
         run: |
           set +e
           java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
-            --input-format csv \
-            --schema src/test/resources/fixtures/csv/delivery.csv-profile.json \
-            --input src/test/resources/fixtures/csv/invalid-wrong-type.csv
+            --profile docs/examples/fictional-bicycle-rentals.csv-profile.json \
+            --input docs/examples/fictional-bicycle-rentals-invalid.csv \
+            --local-only --report json \
+            --report-file target/fictional-bicycle-rentals-invalid.report.json > /dev/null
           exit_code=$?
-          test "$exit_code" -eq 1
+          test "$exit_code" -eq 1 || exit 1
+          python3 -c 'import json; d=json.load(open("target/fictional-bicycle-rentals-invalid.report.json")); assert d["status"] == "INVALID" and len(d["findings"]) == 5'

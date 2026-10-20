@@ -1,3 +1,11 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.adapter.sftp;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,19 +21,27 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
-/** Version-one local profile for a key-authenticated SFTP file validation. */
+/** Versioned local profile for key-authenticated SFTP validation. */
 record SftpProfile(
+        int version,
         String host,
         int port,
         String username,
         String remotePath,
+        String remoteDirectory,
+        Pattern fileNamePattern,
+        Pattern companionFileNamePattern,
+        Pattern deliveryIdPattern,
         Path knownHosts,
         Path privateKey,
         String privateKeyPassphraseEnv,
         String contentFormat,
         Path contentProfile,
         String quarantineRemoteDirectory,
+        String claimRemoteDirectory,
+        String archiveRemoteDirectory,
         String expectedSha256,
         int stabilityChecks,
         Duration stabilityDelay,
@@ -39,7 +55,8 @@ record SftpProfile(
             "remotePath", "knownHosts", "privateKey", "privateKeyPassphraseEnv",
             "contentFormat", "contentProfile", "quarantineRemoteDirectory", "sha256",
             "stabilityChecks", "stabilityDelaySeconds", "maxAttempts", "retryDelaySeconds",
-            "connectTimeoutSeconds");
+            "connectTimeoutSeconds", "remoteDirectory", "filePattern", "companionPattern",
+            "deliveryIdPattern", "claimRemoteDirectory", "archiveRemoteDirectory");
     private static final Pattern HASH = Pattern.compile("[0-9a-fA-F]{64}");
     private static final Pattern ENVIRONMENT_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
@@ -53,7 +70,10 @@ record SftpProfile(
         if (!"sftp".equals(ProfileDocuments.requiredText(root, "format", "SFTP profile"))) {
             throw ProfileDocuments.invalid("SFTP profile format must be 'sftp'");
         }
-        ProfileDocuments.requireVersionOne(root, "SFTP profile");
+        int version = ProfileDocuments.requiredPositiveInteger(root, "version", "SFTP profile");
+        if (version != 1 && version != 2 && version != 3) {
+            throw ProfileDocuments.invalid("Unsupported SFTP profile version: " + version);
+        }
 
         String host = readHost(ProfileDocuments.requiredText(root, "host", "SFTP profile"));
         Integer configuredPort = ProfileDocuments.optionalNonNegativeInteger(root, "port", "SFTP profile");
@@ -67,9 +87,45 @@ record SftpProfile(
             throw ProfileDocuments.invalid("SFTP profile username must not contain whitespace");
         }
 
-        String remotePath = readRemotePath(
-                ProfileDocuments.requiredText(root, "remotePath", "SFTP profile"),
-                "SFTP profile remotePath", false);
+        String remotePath = null;
+        String remoteDirectory = null;
+        Pattern fileNamePattern = null;
+        Pattern companionFileNamePattern = null;
+        Pattern deliveryIdPattern = null;
+        if (version == 1) {
+            if (root.has("remoteDirectory") || root.has("filePattern") || root.has("companionPattern")
+                    || root.has("deliveryIdPattern") || root.has("claimRemoteDirectory")
+                    || root.has("archiveRemoteDirectory")) {
+                throw ProfileDocuments.invalid(
+                        "SFTP profile version 1 requires remotePath and does not support directory selection");
+            }
+            remotePath = readRemotePath(
+                    ProfileDocuments.requiredText(root, "remotePath", "SFTP profile"),
+                    "SFTP profile remotePath", false);
+        } else {
+            if (root.has("remotePath")) {
+                throw ProfileDocuments.invalid(
+                        "SFTP profile version " + version
+                                + " requires remoteDirectory and does not support remotePath");
+            }
+            remoteDirectory = readRemotePath(
+                    ProfileDocuments.requiredText(root, "remoteDirectory", "SFTP profile"),
+                    "SFTP profile remoteDirectory", true);
+            fileNamePattern = readFileNamePattern(root);
+            if (version == 2 && (root.has("companionPattern") || root.has("deliveryIdPattern")
+                    || root.has("claimRemoteDirectory") || root.has("archiveRemoteDirectory"))) {
+                throw ProfileDocuments.invalid(
+                        "SFTP profile version 2 does not support correlated delivery lifecycle fields");
+            }
+            if (version == 3) {
+                companionFileNamePattern = optionalFileNamePattern(root, "companionPattern");
+                deliveryIdPattern = optionalDeliveryIdPattern(root);
+                if (companionFileNamePattern != null && deliveryIdPattern == null) {
+                    throw ProfileDocuments.invalid(
+                            "SFTP profile version 3 requires deliveryIdPattern with companionPattern");
+                }
+            }
+        }
         Path knownHosts = requiredContainedFile(
                 profileFile, root, "knownHosts", "SFTP known_hosts file");
         Path privateKey = requiredContainedFile(
@@ -100,6 +156,19 @@ record SftpProfile(
                     true);
         }
 
+        String claimDirectory = optionalRemoteDirectory(
+                root, "claimRemoteDirectory", "SFTP profile claimRemoteDirectory");
+        String archiveDirectory = optionalRemoteDirectory(
+                root, "archiveRemoteDirectory", "SFTP profile archiveRemoteDirectory");
+        if (version != 3 && (claimDirectory != null || archiveDirectory != null)) {
+            throw ProfileDocuments.invalid(
+                    "claimRemoteDirectory and archiveRemoteDirectory require SFTP profile version 3");
+        }
+        if ((claimDirectory == null) != (archiveDirectory == null)) {
+            throw ProfileDocuments.invalid(
+                    "SFTP profile version 3 requires claimRemoteDirectory and archiveRemoteDirectory together");
+        }
+
         String expectedSha256 = ProfileDocuments.optionalText(root, "sha256", "SFTP profile");
         if (expectedSha256 != null && !HASH.matcher(expectedSha256).matches()) {
             throw ProfileDocuments.invalid("SFTP profile sha256 must be a 64-character hexadecimal hash");
@@ -114,22 +183,92 @@ record SftpProfile(
         int connectTimeoutSeconds = bounded(root, "connectTimeoutSeconds", 10, 1, 120, "SFTP profile");
 
         return new SftpProfile(
+                version,
                 host,
                 port,
                 username,
                 remotePath,
+                remoteDirectory,
+                fileNamePattern,
+                companionFileNamePattern,
+                deliveryIdPattern,
                 knownHosts,
                 privateKey,
                 passphraseEnv,
                 contentFormat,
                 contentProfile,
                 quarantineDirectory,
+                claimDirectory,
+                archiveDirectory,
                 expectedSha256 == null ? null : expectedSha256.toLowerCase(Locale.ROOT),
                 stabilityChecks,
                 Duration.ofSeconds(stabilityDelaySeconds),
                 maxAttempts,
                 Duration.ofSeconds(retryDelaySeconds),
                 Duration.ofSeconds(connectTimeoutSeconds));
+    }
+
+    boolean directorySelection() {
+        return version == 2 || version == 3;
+    }
+
+    boolean correlatedDelivery() {
+        return companionFileNamePattern != null;
+    }
+
+    boolean lifecycleEnabled() {
+        return claimRemoteDirectory != null;
+    }
+
+    private static Pattern readFileNamePattern(JsonNode root) throws ValidationException {
+        String expression = ProfileDocuments.requiredText(root, "filePattern", "SFTP profile");
+        return compileFileNamePattern(expression, "filePattern");
+    }
+
+    private static Pattern optionalFileNamePattern(JsonNode root, String property)
+            throws ValidationException {
+        String expression = ProfileDocuments.optionalText(root, property, "SFTP profile");
+        return expression == null ? null : compileFileNamePattern(expression, property);
+    }
+
+    private static Pattern compileFileNamePattern(String expression, String property)
+            throws ValidationException {
+        if (expression.contains("/") || expression.indexOf('\0') >= 0) {
+            throw ProfileDocuments.invalid(
+                    "SFTP profile " + property
+                            + " must match a file name and must not contain path separators");
+        }
+        try {
+            return Pattern.compile(expression);
+        } catch (PatternSyntaxException e) {
+            throw new ValidationException("SFTP profile " + property
+                    + " contains an invalid regular expression: "
+                    + e.getDescription(), e);
+        }
+    }
+
+    private static Pattern optionalDeliveryIdPattern(JsonNode root) throws ValidationException {
+        String expression = ProfileDocuments.optionalText(root, "deliveryIdPattern", "SFTP profile");
+        if (expression == null) {
+            return null;
+        }
+        if (!expression.contains("(?<deliveryId>")) {
+            throw ProfileDocuments.invalid(
+                    "SFTP profile deliveryIdPattern must contain one named capture group 'deliveryId'");
+        }
+        try {
+            return Pattern.compile(expression);
+        } catch (PatternSyntaxException e) {
+            throw new ValidationException(
+                    "SFTP profile deliveryIdPattern contains an invalid regular expression: "
+                            + e.getDescription(), e);
+        }
+    }
+
+    private static String optionalRemoteDirectory(
+            JsonNode root, String property, String context) throws ValidationException {
+        String value = ProfileDocuments.optionalText(root, property, "SFTP profile");
+        return value == null ? null : readRemotePath(value, context, true);
     }
 
     private static int bounded(

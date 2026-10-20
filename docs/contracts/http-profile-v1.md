@@ -1,5 +1,12 @@
 # HTTP profile contract v1
 
+[English](http-profile-v1.md) | [Deutsch](http-profile-v1.de.md)
+
+This adapter is CLI-only: the desktop GUI and `validate --local-only` reject
+HTTP profiles before transport access. Local POS validation does not need it.
+Use only deliberately configured temporary test endpoints for this project's
+transport checks, not production services.
+
 The HTTP adapter sends one optional local JSON request body and validates one
 JSON response. The profile is a local JSON document with `format: "http"` and
 `version: 1`.

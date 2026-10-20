@@ -1,0 +1,23 @@
+{
+  "format": "sftp",
+  "version": 3,
+  "host": "sftp.example.test",
+  "port": 22,
+  "username": "quality-reader",
+  "remoteDirectory": "/incoming",
+  "filePattern": "^delivery-[A-Z0-9-]+\\.json$",
+  "companionPattern": "^delivery-[A-Z0-9-]+\\.meta\\.json$",
+  "deliveryIdPattern": "^delivery-(?<deliveryId>[A-Z0-9-]+)(?:\\.meta)?\\.json$",
+  "claimRemoteDirectory": "/claim",
+  "archiveRemoteDirectory": "/archive",
+  "knownHosts": "known_hosts",
+  "privateKey": "id_ed25519",
+  "contentFormat": "json",
+  "contentProfile": "delivery.schema.json",
+  "quarantineRemoteDirectory": "/quarantine",
+  "stabilityChecks": 2,
+  "stabilityDelaySeconds": 1,
+  "maxAttempts": 2,
+  "retryDelaySeconds": 1,
+  "connectTimeoutSeconds": 10
+}

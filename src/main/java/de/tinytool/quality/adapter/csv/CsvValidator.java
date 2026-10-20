@@ -1,6 +1,15 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.adapter.csv;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import de.tinytool.quality.adapter.support.JsonPointers;
 import de.tinytool.quality.adapter.support.LocalFiles;
 import de.tinytool.quality.adapter.support.ProfileDocuments;
@@ -20,7 +29,9 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Validates a delimited text file against a version-one CSV profile.
@@ -35,6 +46,14 @@ public final class CsvValidator implements Validator {
 
     public CsvValidator(ObjectMapper objectMapper) {
         this.objectMapper = ProfileDocuments.strictMapper(objectMapper);
+    }
+
+    public void checkProfile(Path profile) throws ValidationException {
+        CsvProfile.read(LocalFiles.requireRegularFile(profile, "CSV profile"), objectMapper);
+    }
+
+    public void checkProfile(JsonNode profile) throws ValidationException {
+        CsvProfile.fromNode(profile);
     }
 
     @Override
@@ -58,6 +77,22 @@ public final class CsvValidator implements Validator {
                         "", "/header", "header", "CSV-Datei enthält keine Kopfzeile")));
             }
 
+            if (profile.envelope() != null) {
+                CSVRecord beginMarker = records.next();
+                if (!isMarker(beginMarker, profile.envelope().begin(), profile.columns().size())) {
+                    return ValidationResult.invalid(List.of(new Finding(
+                            "",
+                            "/envelope/begin",
+                            "marker",
+                            "CSV-Datei enthält keinen gültigen Anfangsmarker '"
+                                    + profile.envelope().begin() + "'")));
+                }
+                if (!records.hasNext()) {
+                    return ValidationResult.invalid(List.of(new Finding(
+                            "", "/header", "header", "CSV-Datei enthält keine Kopfzeile")));
+                }
+            }
+
             CSVRecord header = records.next();
             String headerProblem = compareHeader(header, profile.header(), profile.delimiter());
             if (headerProblem != null) {
@@ -65,9 +100,7 @@ public final class CsvValidator implements Validator {
                         "", "/header", "header", headerProblem)));
             }
 
-            while (records.hasNext()) {
-                validateRecord(records.next(), profile, findings);
-            }
+            validateRows(records, profile, header.getRecordNumber(), findings);
         } catch (IOException | RuntimeException e) {
             throw new ValidationException("Could not read CSV input: " + LocalFiles.safeMessage(e), e);
         }
@@ -75,6 +108,99 @@ public final class CsvValidator implements Validator {
         return findings.isEmpty()
                 ? ValidationResult.valid()
                 : ValidationResult.invalid(findings);
+    }
+
+    private static void validateRows(
+            java.util.Iterator<CSVRecord> records,
+            CsvProfile profile,
+            long headerRecordNumber,
+            List<Finding> findings
+    ) {
+        RowChecks checks = new RowChecks(profile, findings);
+        if (profile.envelope() == null) {
+            while (records.hasNext()) {
+                checks.accept(records.next(), headerRecordNumber);
+            }
+            checks.finish();
+            return;
+        }
+
+        CSVRecord pending = null;
+        while (records.hasNext()) {
+            CSVRecord current = records.next();
+            if (pending != null) {
+                checks.accept(pending, headerRecordNumber);
+            }
+            pending = current;
+        }
+
+        if (pending == null || !isMarker(pending, profile.envelope().end(), profile.columns().size())) {
+            if (pending != null) {
+                checks.accept(pending, headerRecordNumber);
+            }
+            findings.add(new Finding(
+                    "",
+                    "/envelope/end",
+                    "marker",
+                    "CSV-Datei enthält keinen gültigen Endmarker '"
+                            + profile.envelope().end() + "'"));
+        }
+        checks.finish();
+    }
+
+    private static final class RowChecks {
+        private final CsvProfile profile;
+        private final List<Finding> findings;
+        private final List<Integer> keyColumns;
+        private final Map<List<String>, Long> firstRows = new HashMap<>();
+        private long count;
+
+        private RowChecks(CsvProfile profile, List<Finding> findings) {
+            this.profile = profile;
+            this.findings = findings;
+            this.keyColumns = profile.uniqueBy().stream().map(profile.header()::indexOf).toList();
+        }
+
+        private void accept(CSVRecord record, long headerRecordNumber) {
+            count++;
+            validateRecord(record, profile, headerRecordNumber, findings);
+            if (keyColumns.isEmpty() || record.size() != profile.columns().size()) {
+                return;
+            }
+            List<String> key = keyColumns.stream().map(record::get).toList();
+            Long first = firstRows.putIfAbsent(key, record.getRecordNumber());
+            if (first != null) {
+                findings.add(new Finding(
+                        "/rows/" + (record.getRecordNumber() - headerRecordNumber - 1),
+                        "/uniqueBy", "uniqueBy",
+                        "Zeile " + record.getRecordNumber() + ": Schluessel aus "
+                                + String.join(", ", profile.uniqueBy())
+                                + " bereits in Zeile " + first + " vorhanden"));
+            }
+        }
+
+        private void finish() {
+            if (profile.minRecords() != null && count < profile.minRecords()) {
+                findings.add(new Finding("", "/minRecords", "minRecords",
+                        count + " Datensaetze gefunden, mindestens " + profile.minRecords() + " erwartet"));
+            }
+            if (profile.maxRecords() != null && count > profile.maxRecords()) {
+                findings.add(new Finding("", "/maxRecords", "maxRecords",
+                        count + " Datensaetze gefunden, hoechstens " + profile.maxRecords() + " erwartet"));
+            }
+        }
+    }
+
+    private static boolean isMarker(CSVRecord record, String marker, int expectedColumnCount) {
+        if (record.size() != expectedColumnCount || !marker.equals(record.get(0))) {
+            return false;
+        }
+        for (int index = 1; index < record.size(); index++) {
+            if (!record.get(index).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static Reader newStrictReader(Path inputFile, CsvProfile profile) throws IOException {
@@ -87,10 +213,11 @@ public final class CsvValidator implements Validator {
     private static void validateRecord(
             CSVRecord record,
             CsvProfile profile,
+            long headerRecordNumber,
             List<Finding> findings
     ) {
         long recordNumber = record.getRecordNumber();
-        int rowIndex = Math.toIntExact(recordNumber - 2);
+        int rowIndex = Math.toIntExact(recordNumber - headerRecordNumber - 1);
         if (record.size() != profile.columns().size()) {
             findings.add(new Finding(
                     "/rows/" + rowIndex,
@@ -103,6 +230,9 @@ public final class CsvValidator implements Validator {
 
         for (int index = 0; index < profile.columns().size(); index++) {
             CsvColumn column = profile.columns().get(index);
+            if (!column.enabled()) {
+                continue;
+            }
             String path = "/rows/" + rowIndex + "/" + JsonPointers.escape(column.name());
             String schemaPath = "/columns/" + JsonPointers.escape(column.name());
             ScalarValidation.validateField(
@@ -113,6 +243,7 @@ public final class CsvValidator implements Validator {
                     column.rules(),
                     path,
                     schemaPath,
+                    profile.decimalSeparator(),
                     findings);
         }
     }

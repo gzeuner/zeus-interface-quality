@@ -1,9 +1,19 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.cli;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
-import de.tinytool.quality.adapter.http.HttpValidator;
+import de.tinytool.quality.adapter.support.LocalFiles;
+import de.tinytool.quality.adapter.support.LocalOutputs;
+import de.tinytool.quality.adapter.support.ProfileDocuments;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
@@ -17,6 +27,7 @@ import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
 
 import java.io.PrintWriter;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.concurrent.Callable;
@@ -33,11 +44,18 @@ public final class ValidateCommand implements Callable<Integer> {
 
     @Option(
             names = {"--schema", "--profile"},
-            required = true,
             paramLabel = "PATH",
             description = "Path to the local JSON Schema or format profile."
     )
     private Path schema;
+
+    @Option(names = "--report-file", paramLabel = "PATH",
+            description = "Also save the report as UTF-8. Parent directory must exist. Never overwrites input/profile.")
+    private Path reportFile;
+
+    @Option(names = "--local-only",
+            description = "Reject HTTP/SFTP before validation. Suitable for offline build pipelines.")
+    private boolean localOnly;
 
     @Option(
             names = "--input",
@@ -84,7 +102,7 @@ public final class ValidateCommand implements Callable<Integer> {
     }
 
     ValidateCommand(Validator jsonValidator, Validator csvValidator, Validator fixedWidthValidator) {
-        this(new ValidatorRegistry(jsonValidator, csvValidator, fixedWidthValidator, new HttpValidator()));
+        this(new ValidatorRegistry(jsonValidator, csvValidator, fixedWidthValidator));
     }
 
     ValidateCommand(ValidatorRegistry validators) {
@@ -99,18 +117,39 @@ public final class ValidateCommand implements Callable<Integer> {
         PrintWriter err = spec.commandLine().getErr();
 
         try {
-            ValidationResult result = validators.validatorFor(inputFormat, schema).validate(input, schema);
-            if (reportFormat == ReportFormat.JSON) {
-                out.println(jsonReportWriter.write(result));
-            } else {
-                out.print(textReportWriter.write(result));
+            if (schema == null) {
+                throw new ValidationException("Specify a local --profile or --schema.");
             }
+            if (reportFile != null) {
+                LocalOutputs.protectSources(reportFile, input, schema);
+            }
+            if (localOnly) {
+                requireLocalProfile();
+            }
+            ValidationResult result = validators.validatorFor(inputFormat, schema).validate(input, schema);
+            String report = reportFormat == ReportFormat.JSON
+                    ? jsonReportWriter.write(result) + System.lineSeparator()
+                    : textReportWriter.write(result);
+            if (reportFile != null) {
+                LocalOutputs.write(reportFile, report, input, schema);
+            }
+            out.print(report);
             out.flush();
             return result.isValid() ? 0 : 1;
-        } catch (ValidationException | JsonProcessingException e) {
+        } catch (ValidationException | IOException e) {
             err.println("ERROR: " + e.getMessage());
             err.flush();
             return 2;
+        }
+    }
+
+    private void requireLocalProfile() throws ValidationException {
+        var root = ProfileDocuments.readRoot(LocalFiles.requireRegularFile(schema, "Profile"),
+                ProfileDocuments.strictMapper(new ObjectMapper()), "profile");
+        String format = root == null ? "" : root.path("format").asText("");
+        if (inputFormat == InputFormat.HTTP || inputFormat == InputFormat.SFTP
+                || "http".equals(format) || "sftp".equals(format)) {
+            throw new ValidationException("HTTP/SFTP is disabled by --local-only.");
         }
     }
 

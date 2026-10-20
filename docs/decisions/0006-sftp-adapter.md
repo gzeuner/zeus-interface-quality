@@ -13,7 +13,8 @@ engine.
 
 ## Decision
 
-Implement a one-remote-file SFTP adapter with these rules:
+Implement a one-remote-file SFTP adapter with these rules. Directory selection
+is intentionally reserved for the version-two contract in Iteration 5:
 
 1. Use the maintained JSch library as a small transport dependency.
 2. Require an explicit `known_hosts` file and enable strict host-key checking.
@@ -33,7 +34,8 @@ Implement a one-remote-file SFTP adapter with these rules:
 
 The adapter is useful in CI without requiring an external SFTP server in every
 test run, and its security assumptions are visible in the profile. The
-embedded integration test still exercises the real transport path locally. It does not yet
-cover password auth, OpenSSH agent/config discovery, directory polling,
-multi-file correlation, or success archiving. Those concerns can be added as
-separate contracts instead of silently expanding version one.
+embedded integration test still exercises the real transport path locally. Version one
+does not cover password auth, OpenSSH agent/config discovery, directory polling,
+multi-file correlation, or success archiving. Directory selection is added by the
+separate version-two contract; multi-file correlation and success archiving remain
+out of scope until a later, explicit contract.

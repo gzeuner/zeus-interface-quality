@@ -67,6 +67,5 @@ not a local demo. It only becomes runnable after the endpoint, trusted
 `known_hosts`, private key, and content profile have been supplied as described
 in `docs/examples/README.md`.
 
-The full suite currently passes with 76 tests and two pre-existing skipped
-tests. A live-server integration test is intentionally left for a future
-environment-specific test profile with managed credentials and host keys.
+The exact-file slice remains covered by the full suite. Directory selection is
+delivered separately in Iteration 5 so that the v1 contract stays stable.

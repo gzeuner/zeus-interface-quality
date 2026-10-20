@@ -1,3 +1,11 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.adapter.sftp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,11 +29,15 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Matcher;
 
 /**
- * Downloads one stable SFTP file, verifies its integrity, and delegates its
- * contents to the existing JSON, CSV, or fixed-width validator.
+ * Selects and downloads a stable SFTP file, verifies its integrity, and
+ * delegates its contents to the existing JSON, CSV, or fixed-width validator.
  */
 public final class SftpValidator implements Validator {
 
@@ -74,7 +86,8 @@ public final class SftpValidator implements Validator {
     @Override
     public ValidationResult validate(Path input, Path schema) throws ValidationException {
         if (input != null) {
-            throw new ValidationException("SFTP validation does not accept --input; the remotePath is in the profile");
+            throw new ValidationException(
+                    "SFTP validation does not accept --input; the remote location is in the profile");
         }
 
         Path profileFile = LocalFiles.requireRegularFile(schema, "SFTP profile");
@@ -82,9 +95,8 @@ public final class SftpValidator implements Validator {
         Validator contentValidator = contentValidator(profile.contentFormat());
 
         Path temporaryDirectory = createTemporaryDirectory();
-        Path temporaryFile = temporaryDirectory.resolve(fileName(profile.remotePath()));
         try {
-            return downloadAndValidate(profile, contentValidator, temporaryFile);
+            return downloadAndValidate(profile, contentValidator, temporaryDirectory);
         } finally {
             deleteTemporaryDirectory(temporaryDirectory);
         }
@@ -93,41 +105,75 @@ public final class SftpValidator implements Validator {
     private ValidationResult downloadAndValidate(
             SftpProfile profile,
             Validator contentValidator,
-            Path temporaryFile
+            Path temporaryDirectory
     ) throws ValidationException {
         SftpTransferException lastTransferFailure = null;
         for (int attempt = 1; attempt <= profile.maxAttempts(); attempt++) {
             try (SftpTransport transport = transportFactory.open(profile)) {
-                SftpRemoteMetadata before = stableMetadata(transport, profile);
-                deleteTemporaryFile(temporaryFile);
-                transport.download(profile.remotePath(), temporaryFile);
-                SftpRemoteMetadata after = transport.stat(profile.remotePath());
-                if (!before.sameContentAs(after)) {
-                    throw new SftpTransferException(
-                            "Remote SFTP file changed while it was being downloaded");
+                RemoteSelection selection = selectRemotePath(transport, profile);
+                if (selection.matchCount() > 1) {
+                    return directoryFinding(
+                            profile.correlatedDelivery()
+                                    ? "SFTP-Verzeichnis enthält mehrere vollständige oder unvollständige Lieferungen"
+                                    : "SFTP-Verzeichnis enthält mehrere passende reguläre Dateien");
                 }
+                if (selection.files().isEmpty()) {
+                    if (attempt == profile.maxAttempts()) {
+                        return directoryFinding(
+                                profile.lifecycleEnabled()
+                                        ? "SFTP-Verzeichnis enthält keine passende oder beanspruchte Lieferung"
+                                        : "SFTP-Verzeichnis enthält keine passende reguläre Datei");
+                    }
+                    sleep(profile.retryDelay(), "SFTP directory retry delay");
+                    continue;
+                }
+                RemoteSelection claimedSelection = claimIfConfigured(transport, profile, selection);
+                List<Finding> findings = new ArrayList<>();
+                for (int index = 0; index < claimedSelection.files().size(); index++) {
+                    SelectedRemoteFile selectedFile = claimedSelection.files().get(index);
+                    Path temporaryFile = temporaryDirectory.resolve(
+                            index + "-" + fileName(selectedFile.remotePath()));
+                    SftpRemoteMetadata before = stableMetadata(
+                            transport, profile, selectedFile.remotePath());
+                    deleteTemporaryFile(temporaryFile);
+                    transport.download(selectedFile.remotePath(), temporaryFile);
+                    SftpRemoteMetadata after = transport.stat(selectedFile.remotePath());
+                    if (!before.sameContentAs(after)) {
+                        throw new SftpTransferException(
+                                "Remote SFTP file changed while it was being downloaded");
+                    }
 
-                if (profile.expectedSha256() != null) {
-                    String actualSha256 = sha256(temporaryFile);
-                    if (!profile.expectedSha256().equalsIgnoreCase(actualSha256)) {
-                        List<Finding> findings = List.of(new Finding(
-                                "/remote/hash",
-                                "/sha256",
-                                "sha256",
-                                "SHA-256-Prüfsumme stimmt nicht mit dem SFTP-Profil überein"));
-                        quarantineIfConfigured(transport, profile);
-                        return ValidationResult.invalid(findings);
+                    if (index == 0 && profile.expectedSha256() != null) {
+                        String actualSha256 = sha256(temporaryFile);
+                        if (!profile.expectedSha256().equalsIgnoreCase(actualSha256)) {
+                            findings.add(new Finding(
+                                    "/remote/hash",
+                                    "/sha256",
+                                    "sha256",
+                                    "SHA-256-Prüfsumme stimmt nicht mit dem SFTP-Profil überein"));
+                            break;
+                        }
+                    }
+
+                    ValidationResult contentResult = contentValidator.validate(
+                            temporaryFile, profile.contentProfile());
+                    if (!contentResult.isValid()) {
+                        findings.addAll(prefixContentFindings(
+                                contentResult, selectedFile, profile.version() == 1));
                     }
                 }
 
-                ValidationResult contentResult = contentValidator.validate(
-                        temporaryFile, profile.contentProfile());
-                if (contentResult.isValid()) {
-                    return contentResult;
+                if (!findings.isEmpty()) {
+                    LifecycleOutcome outcome = quarantineIfConfigured(
+                            transport, profile, claimedSelection);
+                    return ValidationResult.invalid(findings, outcome.metadata());
                 }
 
-                quarantineIfConfigured(transport, profile);
-                return prefixContentFindings(contentResult);
+                LifecycleOutcome outcome = archiveIfConfigured(
+                        transport, profile, claimedSelection);
+                return outcome.metadata().isEmpty()
+                        ? ValidationResult.valid()
+                        : ValidationResult.valid(outcome.metadata());
             } catch (SftpTransferException e) {
                 lastTransferFailure = e;
                 if (attempt == profile.maxAttempts()) {
@@ -142,16 +188,170 @@ public final class SftpValidator implements Validator {
                 : lastTransferFailure;
     }
 
-    private static SftpRemoteMetadata stableMetadata(
+    private static RemoteSelection selectRemotePath(
             SftpTransport transport,
             SftpProfile profile
     ) throws ValidationException {
+        if (!profile.directorySelection()) {
+            return new RemoteSelection(
+                    List.of(new SelectedRemoteFile(
+                            fileName(profile.remotePath()), profile.remotePath(), "primary", null, false)),
+                    null,
+                    1);
+        }
+
+        if (profile.lifecycleEnabled()) {
+            RemoteSelection claimed = selectFromDirectory(
+                    transport.list(profile.claimRemoteDirectory()),
+                    profile,
+                    profile.claimRemoteDirectory(),
+                    true);
+            if (!claimed.files().isEmpty() || claimed.matchCount() > 1) {
+                return claimed;
+            }
+        }
+        return selectFromDirectory(
+                transport.list(profile.remoteDirectory()), profile, profile.remoteDirectory(), false);
+    }
+
+    private static RemoteSelection selectFromDirectory(
+            List<SftpRemoteEntry> entries,
+            SftpProfile profile,
+            String directory,
+            boolean claimed
+    ) throws ValidationException {
+        List<SftpRemoteEntry> primary = entries.stream()
+                .filter(entry -> entry.metadata() != null && entry.metadata().regularFile())
+                .filter(entry -> profile.fileNamePattern().matcher(entry.name()).matches())
+                .sorted(Comparator.comparing(SftpRemoteEntry::name))
+                .toList();
+        if (!profile.correlatedDelivery()) {
+            if (primary.isEmpty()) {
+                return new RemoteSelection(List.of(), null, 0);
+            }
+            String deliveryId = deliveryId(profile, primary.getFirst().name());
+            return new RemoteSelection(
+                    List.of(toSelectedFile(primary.getFirst(), directory, "primary", deliveryId, claimed)),
+                    deliveryId,
+                    primary.size());
+        }
+
+        List<SftpRemoteEntry> companions = entries.stream()
+                .filter(entry -> entry.metadata() != null && entry.metadata().regularFile())
+                .filter(entry -> profile.companionFileNamePattern().matcher(entry.name()).matches())
+                .sorted(Comparator.comparing(SftpRemoteEntry::name))
+                .toList();
+        Map<String, List<SftpRemoteEntry>> primaryById = groupByDeliveryId(primary, profile);
+        Map<String, List<SftpRemoteEntry>> companionById = groupByDeliveryId(companions, profile);
+        Map<String, DeliveryCandidate> candidates = new LinkedHashMap<>();
+        primaryById.forEach((id, files) -> candidates
+                .computeIfAbsent(id, ignored -> new DeliveryCandidate())
+                .primary.addAll(files));
+        companionById.forEach((id, files) -> candidates
+                .computeIfAbsent(id, ignored -> new DeliveryCandidate())
+                .companions.addAll(files));
+        List<Map.Entry<String, DeliveryCandidate>> complete = candidates.entrySet().stream()
+                .filter(entry -> entry.getValue().primary.size() == 1
+                        && entry.getValue().companions.size() == 1)
+                .toList();
+        if (complete.size() != 1 || candidates.size() != 1) {
+            return new RemoteSelection(List.of(), null, complete.size() + candidates.size());
+        }
+        String deliveryId = complete.getFirst().getKey();
+        DeliveryCandidate candidate = complete.getFirst().getValue();
+        return new RemoteSelection(
+                List.of(
+                        toSelectedFile(candidate.primary.getFirst(), directory, "primary", deliveryId, claimed),
+                        toSelectedFile(candidate.companions.getFirst(), directory,
+                                "companion", deliveryId, claimed)),
+                deliveryId,
+                1);
+    }
+
+    private static ValidationResult directoryFinding(String message) {
+        return ValidationResult.invalid(List.of(new Finding(
+                "/remote/files",
+                "/filePattern",
+                "fileCount",
+                message)));
+    }
+
+    private static Map<String, List<SftpRemoteEntry>> groupByDeliveryId(
+            List<SftpRemoteEntry> entries,
+            SftpProfile profile
+    ) {
+        Map<String, List<SftpRemoteEntry>> grouped = new LinkedHashMap<>();
+        for (SftpRemoteEntry entry : entries) {
+            Matcher matcher = profile.deliveryIdPattern().matcher(entry.name());
+            if (matcher.matches()) {
+                grouped.computeIfAbsent(matcher.group("deliveryId"), ignored -> new ArrayList<>())
+                        .add(entry);
+            }
+        }
+        return grouped;
+    }
+
+    private static String deliveryId(SftpProfile profile, String name) {
+        if (profile.deliveryIdPattern() == null) {
+            return null;
+        }
+        Matcher matcher = profile.deliveryIdPattern().matcher(name);
+        return matcher.matches() ? matcher.group("deliveryId") : null;
+    }
+
+    private static SelectedRemoteFile toSelectedFile(
+            SftpRemoteEntry entry,
+            String directory,
+            String role,
+            String deliveryId,
+            boolean claimed
+    ) {
+        return new SelectedRemoteFile(
+                entry.name(), joinRemoteDirectory(directory, entry.name()), role, deliveryId, claimed);
+    }
+
+    private static RemoteSelection claimIfConfigured(
+            SftpTransport transport,
+            SftpProfile profile,
+            RemoteSelection selection
+    ) throws ValidationException {
+        if (!profile.lifecycleEnabled() || selection.files().stream().allMatch(SelectedRemoteFile::claimed)) {
+            return selection;
+        }
+        List<SelectedRemoteFile> claimedFiles = new ArrayList<>();
+        try {
+            for (SelectedRemoteFile file : selection.files()) {
+                String target = joinRemoteDirectory(profile.claimRemoteDirectory(), file.name());
+                transport.move(file.remotePath(), target);
+                claimedFiles.add(new SelectedRemoteFile(
+                        file.name(), target, file.role(), file.deliveryId(), true));
+            }
+        } catch (SftpTransferException e) {
+            for (SelectedRemoteFile file : claimedFiles) {
+                try {
+                    transport.move(file.remotePath(), joinRemoteDirectory(
+                            profile.remoteDirectory(), file.name()));
+                } catch (SftpTransferException ignored) {
+                    // The original transfer exception remains the actionable failure.
+                }
+            }
+            throw new SftpTransferException("Could not claim the SFTP delivery: "
+                    + LocalFiles.safeMessage(e), e);
+        }
+        return new RemoteSelection(List.copyOf(claimedFiles), selection.deliveryId(), selection.matchCount());
+    }
+
+    private static SftpRemoteMetadata stableMetadata(
+            SftpTransport transport,
+            SftpProfile profile,
+            String remotePath
+    ) throws ValidationException {
         SftpRemoteMetadata first = requireRegularFile(
-                transport.stat(profile.remotePath()), profile.remotePath());
+                transport.stat(remotePath), remotePath);
         for (int check = 1; check < profile.stabilityChecks(); check++) {
             sleep(profile.stabilityDelay(), "SFTP stability check delay");
             SftpRemoteMetadata current = requireRegularFile(
-                    transport.stat(profile.remotePath()), profile.remotePath());
+                    transport.stat(remotePath), remotePath);
             if (!first.sameContentAs(current)) {
                 throw new SftpTransferException(
                         "Remote SFTP file is still changing; stable snapshot was not established");
@@ -189,37 +389,117 @@ public final class SftpValidator implements Validator {
         }
     }
 
-    private static void quarantineIfConfigured(
+    private static LifecycleOutcome quarantineIfConfigured(
             SftpTransport transport,
-            SftpProfile profile
+            SftpProfile profile,
+            RemoteSelection selection
     ) throws ValidationException {
         if (profile.quarantineRemoteDirectory() == null) {
-            return;
+            return new LifecycleOutcome(lifecycleMetadata(
+                    selection, "CLAIMED_INVALID", List.of(), List.of()));
         }
-        String target = joinRemoteDirectory(
-                profile.quarantineRemoteDirectory(),
-                fileName(profile.remotePath()))
-                + "."
-                + QUARANTINE_TIMESTAMP.format(Instant.now())
-                + ".invalid";
-        try {
-            transport.move(profile.remotePath(), target);
-        } catch (SftpTransferException e) {
-            throw new ValidationException("Could not quarantine invalid SFTP file: "
-                    + LocalFiles.safeMessage(e), e);
+        List<String> targets = new ArrayList<>();
+        for (SelectedRemoteFile file : selection.files()) {
+            String target = joinRemoteDirectory(
+                    profile.quarantineRemoteDirectory(), file.name())
+                    + "."
+                    + QUARANTINE_TIMESTAMP.format(Instant.now())
+                    + "-"
+                    + UUID.randomUUID().toString().substring(0, 8)
+                    + ".invalid";
+            try {
+                transport.move(file.remotePath(), target);
+                targets.add(target);
+            } catch (SftpTransferException e) {
+                throw new ValidationException("Could not quarantine invalid SFTP file: "
+                        + LocalFiles.safeMessage(e), e);
+            }
         }
+        return new LifecycleOutcome(lifecycleMetadata(
+                selection, "QUARANTINED", List.of(), targets));
     }
 
-    private ValidationResult prefixContentFindings(ValidationResult result) {
+    private static LifecycleOutcome archiveIfConfigured(
+            SftpTransport transport,
+            SftpProfile profile,
+            RemoteSelection selection
+    ) throws ValidationException {
+        if (!profile.lifecycleEnabled()) {
+            return new LifecycleOutcome(Map.of());
+        }
+        List<String> targets = new ArrayList<>();
+        for (SelectedRemoteFile file : selection.files()) {
+            String target = joinRemoteDirectory(
+                    profile.archiveRemoteDirectory(), file.name())
+                    + "."
+                    + QUARANTINE_TIMESTAMP.format(Instant.now())
+                    + "-"
+                    + UUID.randomUUID().toString().substring(0, 8)
+                    + ".validated";
+            try {
+                transport.move(file.remotePath(), target);
+                targets.add(target);
+            } catch (SftpTransferException e) {
+                for (int moved = 0; moved < targets.size(); moved++) {
+                    SelectedRemoteFile alreadyArchived = selection.files().get(moved);
+                    try {
+                        transport.move(targets.get(moved), alreadyArchived.remotePath());
+                    } catch (SftpTransferException ignored) {
+                        // The archive failure remains the actionable error.
+                    }
+                }
+                throw new ValidationException("Could not archive valid SFTP file: "
+                        + LocalFiles.safeMessage(e), e);
+            }
+        }
+        return new LifecycleOutcome(lifecycleMetadata(
+                selection, "ARCHIVED", targets, List.of()));
+    }
+
+    private static Map<String, Object> lifecycleMetadata(
+            RemoteSelection selection,
+            String lifecycle,
+            List<String> archivedFiles,
+            List<String> quarantinedFiles
+    ) {
+        if (selection.files().stream().noneMatch(SelectedRemoteFile::claimed)) {
+            return Map.of();
+        }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (selection.deliveryId() != null) {
+            metadata.put("deliveryId", selection.deliveryId());
+        }
+        metadata.put("filesValidated", selection.files().size());
+        metadata.put("lifecycle", lifecycle);
+        if (!archivedFiles.isEmpty()) {
+            metadata.put("archivedFiles", archivedFiles);
+        }
+        if (!quarantinedFiles.isEmpty()) {
+            metadata.put("quarantinedFiles", quarantinedFiles);
+        }
+        return metadata;
+    }
+
+    private static List<Finding> prefixContentFindings(
+            ValidationResult result,
+            SelectedRemoteFile selectedFile,
+            boolean legacyPath
+    ) {
         List<Finding> findings = new ArrayList<>();
+        String instancePrefix = legacyPath || selectedFile.role().equals("primary")
+                ? "/content"
+                : "/companion/" + selectedFile.name() + "/content";
+        String schemaPrefix = legacyPath || selectedFile.role().equals("primary")
+                ? "/content/profile"
+                : "/companion/profile";
         for (Finding finding : result.findings()) {
             findings.add(new Finding(
-                    prefix(finding.instancePath(), "/content"),
-                    prefix(finding.schemaPath(), "/content/profile"),
+                    prefix(finding.instancePath(), instancePrefix),
+                    prefix(finding.schemaPath(), schemaPrefix),
                     finding.keyword(),
                     finding.message()));
         }
-        return ValidationResult.invalid(findings);
+        return findings;
     }
 
     private Validator contentValidator(String contentFormat) throws ValidationException {
@@ -294,5 +574,30 @@ public final class SftpValidator implements Validator {
 
     private static String joinRemoteDirectory(String directory, String fileName) {
         return "/".equals(directory) ? "/" + fileName : directory + "/" + fileName;
+    }
+
+    private record RemoteSelection(
+            List<SelectedRemoteFile> files,
+            String deliveryId,
+            int matchCount
+    ) {
+    }
+
+    private record SelectedRemoteFile(
+            String name,
+            String remotePath,
+            String role,
+            String deliveryId,
+            boolean claimed
+    ) {
+    }
+
+    private static final class DeliveryCandidate {
+
+        private final List<SftpRemoteEntry> primary = new ArrayList<>();
+        private final List<SftpRemoteEntry> companions = new ArrayList<>();
+    }
+
+    private record LifecycleOutcome(Map<String, Object> metadata) {
     }
 }

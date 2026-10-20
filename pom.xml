@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Author: tiny-tool.de | SPDX-License-Identifier: Apache-2.0 | See LICENSE. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -8,7 +9,22 @@
     <artifactId>zeus-interface-quality</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>ZEUS Interface Quality</name>
-    <description>Technology-agnostic interface quality tool, starting with local JSON Schema validation.</description>
+    <description>Local interface validation with a desktop GUI, headless CLI, portable rules and JSON/text reports.</description>
+    <url>https://tiny-tool.de/</url>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>tiny-tool.de</id>
+            <name>tiny-tool.de</name>
+            <url>https://tiny-tool.de/</url>
+        </developer>
+    </developers>
 
     <properties>
         <java.version>21</java.version>
@@ -108,6 +124,25 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>${project.basedir}</directory>
+                <includes>
+                    <include>LICENSE</include>
+                    <include>NOTICE</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>docs/examples</directory>
+                <targetPath>profiles</targetPath>
+                <includes>
+                    <include>pos-relex.csv-profile.json</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

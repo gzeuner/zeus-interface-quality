@@ -1,0 +1,128 @@
+# Changelog / Änderungsprotokoll
+
+[English guide](README.md) | [Deutsche Anleitung](README.de.md)
+
+This log records user-visible changes. / Dieses Protokoll beschreibt
+anwenderrelevante Änderungen.
+
+## Unreleased / Unveröffentlicht
+
+Documentation and verification status: **2026-10-20**.
+Current Maven version: **0.1.0-SNAPSHOT**. No release, tag, commit or push is
+implied by this entry.
+
+### English
+
+#### Added
+
+- Deliberately invalid synthetic bicycle-rental CSV with five verified findings
+  and a local JSON-report walkthrough using the existing rule file.
+- GUI screenshots captured during tests, workflow diagrams, and a refreshed
+  English/German quick start.
+- Apache License 2.0, `NOTICE`, Maven license metadata, and tiny-tool.de
+  attribution in the project Java sources.
+- Local Swing desktop GUI via `gui` and the Windows `start-gui.cmd` launcher.
+  Background validation, input/profile selection, findings table, detail view,
+  elapsed time and JSON/text report export.
+- LED indicators: idle/running/valid/invalid/error, with explanatory text;
+  separate file-existence LEDs for input and profile.
+- Optional bundled CSV preset for existing local workflows.
+- Backward-compatible CSV options: `decimalSeparator`, `envelope`,
+  `minRecords`, `maxRecords`, composite `uniqueBy` and per-column `enabled`.
+  Shared scalar types now include `date` and `time`.
+- Visual CSV profile editor for portable configurations used unchanged by
+  the GUI and CLI.
+- CLI `validate --preset relex`, `--report-file` and `--local-only`;
+  `profile --preset relex [--output PATH]` exports an editable preset.
+- Synthetic CSV fixtures, profile/pipeline tests, GUI smoke tests and
+  headless-process verification.
+- Separate English/German guides, examples, CSV/report/HTTP/SFTP contracts and this
+  bilingual changelog.
+
+#### Changed
+
+- GUI refuses HTTP/SFTP profiles. CLI `--local-only` blocks remote adapters
+  before transport access; existing CLI transport support remains available.
+- GUI input/profile changes invalidate stale results. Busy operations lock
+  relevant controls; a missing graphical desktop produces explicit exit `2`.
+- Shared staged UTF-8 output protects input/profile files and existing aliases.
+  CLI report-write failure produces exit `2` without stdout success output.
+  Profile export refuses to overwrite existing files.
+- Documentation distinguishes current functionality from historical iteration
+  scope and fixes the quick start to build a JAR with `package`, not just `test`.
+
+#### Verified
+
+- Full offline build after the example and license update: 138 tests,
+  0 failures, 0 errors, 2 skipped.
+- Synthetic invalid CSV: `INVALID`, five findings, exit `1`; JSON report saved
+  only in the local ignored `reports/` directory.
+- Headless CLI exit codes `0`/`1`/`2`, report writing, GUI configuration and
+  LED transitions, packaged GUI startup/shutdown.
+- No production SFTP access. Customer CSVs and reports remain local.
+
+### Deutsch
+
+#### Hinzugefügt
+
+- Absichtlich fehlerhafte synthetische Fahrradverleih-CSV mit fünf geprüften
+  Befunden und lokalem JSON-Report mit derselben Regeldatei.
+- GUI-Screenshots aus Tests, Ablaufgrafiken und überarbeiteter Schnellstart auf
+  Deutsch und Englisch.
+- Apache License 2.0, `NOTICE`, Maven-Lizenzdaten und tiny-tool.de als Urheber
+  in den Java-Quelldateien.
+- Lokale Swing-Desktop-GUI ueber `gui` und Windows-Starter `start-gui.cmd`.
+  Hintergrundpruefung, Datei-/Profilauswahl, Befundtabelle, Details, Laufzeit
+  und JSON-/Text-Reportexport.
+- LED-Anzeigen fuer bereit/laufend/gueltig/ungueltig/Fehler mit Klartext;
+  separate Dateiexistenzanzeigen fuer Eingabe und Profil.
+- Optional mitgeliefertes CSV-Preset für bestehende lokale Abläufe.
+- Rueckwaertskompatible CSV-Optionen: `decimalSeparator`, `envelope`,
+  `minRecords`, `maxRecords`, zusammengesetztes `uniqueBy` und `enabled`
+  je Spalte. Gemeinsame skalare Typen um `date`/`time` erweitert.
+- Visueller CSV-Regeleditor fuer unveraendert in GUI/CLI verwendbare Profile.
+- CLI `validate --preset relex`, `--report-file`, `--local-only` sowie
+  `profile --preset relex [--output PATH]` fuer editierbaren Profilexport.
+- Synthetische CSV-Fixtures, Profil-/Pipelinetests, GUI-Smoke-Tests und
+  headless Prozesspruefung.
+- Getrennte deutsche/englische Anleitungen, Beispiele, CSV-/Report-/HTTP-/SFTP-Vertraege
+  und dieses zweisprachige Changelog.
+
+#### Geändert
+
+- GUI lehnt HTTP/SFTP ab. CLI-Schalter `--local-only` sperrt Remoteadapter
+  vor Transportzugriff; bisherige CLI-Transportfunktionen bleiben erhalten.
+- Eingabe-/Profilwechsel verwerfen alte GUI-Ergebnisse. Relevante
+  Bedienelemente sind waehrend des Vorgangs gesperrt. Fehlender grafischer
+  Desktop fuehrt explizit zu Exit `2`.
+- Gemeinsame gestufte UTF-8-Ausgabe schuetzt Eingabe/Profil und vorhandene
+  Dateialiasse. CLI-Schreibfehler liefern `2` ohne Erfolgsausgabe auf stdout.
+  Profilexport ueberschreibt keine vorhandenen Dateien.
+- Dokumentation trennt aktuellen Stand von historischen Iterationsgrenzen;
+  der Schnellstart erzeugt mit `package` statt nur `test` ein JAR.
+
+#### Verifiziert
+
+- Vollständiger Offline-Build nach Beispiel- und Lizenzergänzung:
+  138 Tests, 0 Fehlschläge, 0 Fehler, 2 übersprungen.
+- Synthetische fehlerhafte CSV: `INVALID`, fünf Befunde, Exit `1`; JSON-Report
+  nur im lokalen ignorierten Ordner `reports/` gespeichert.
+- Headless CLI-Exitcodes `0`/`1`/`2`, Reportausgabe, GUI-Konfiguration,
+  LED-Wechsel und Start/Ende der paketierten GUI.
+- Kein produktiver SFTP-Zugriff. Kundendaten und Reports bleiben lokal.
+
+## Earlier development / Bisherige Entwicklung
+
+These are historical milestones, not numbered releases. / Historische
+Meilensteine, keine nummerierten Releases.
+
+| Date / Datum | English | Deutsch | Record / Dokument |
+|---|---|---|---|
+| 2026-09-25 | Iteration 4: stable single-file SFTP validation, strict host keys, hash and opt-in quarantine | Iteration 4: stabile SFTP-Einzeldatei, strikte Hostkeys, Hash und optionale Quarantaene | [Iteration 4](docs/iterations/iteration-4-sftp.md) |
+| 2026-09-21 | Iteration 3: HTTP request/response validation | Iteration 3: HTTP-Anfrage-/Antwortvalidierung | [Iteration 3](docs/iterations/iteration-3-http.md) |
+| 2026-09-16 | CSV and fixed-width integration; shared tabular checks and format detection | CSV-/Fixed-Width-Integration; gemeinsame Tabellenregeln und Formaterkennung | [CSV](docs/iterations/iteration-2a.md), [Fixed-width](docs/iterations/iteration-2b.md), [shared checks](docs/decisions/0004-shared-tabular-checks.md) |
+
+The initial local JSON Schema CLI and report/exit-code contract are documented
+in [Iteration 1](docs/iterations/iteration-1.md).
+Die urspruengliche lokale JSON-Schema-CLI samt Report-/Exitcodevertrag ist in
+dieser Iteration dokumentiert; hier wird kein unbekanntes Releasedatum ergaenzt.

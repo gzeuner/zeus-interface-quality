@@ -21,3 +21,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local validation inputs, profiles, and generated reports
+data/
+reports/
+*.csv-profile.json
+!docs/examples/fictional-bicycle-rentals.csv-profile.json
+*.report.json
+*.report.txt

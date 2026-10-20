@@ -1,0 +1,5 @@
+rentalId;station;startDate;durationMinutes;distanceKm;bikeType;contactEmail
+BIKE-001;North Park;2026-04-06;42;8,50;city;rider1@example.org
+BIKE-002;Harbor West;2026-04-07;0;12,75;electric;rider2@example.org
+BIKE-003;River Loop;2026-13-08;18;3,20;cargo;rider3@example.org
+BIKE-003;East Square;2026-04-09;125;24,10;scooter;not-an-email

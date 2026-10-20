@@ -1,179 +1,340 @@
+<p align="center"><a href="https://tiny-tool.de/"><img src="src/main/resources/brand/tt-tools-tipps-facts.png" alt="tiny-tool.de — Tools · Tipps · Facts" width="520"></a></p>
+
 # ZEUS Interface Quality
 
-Technology-agnostic interface quality tool: local JSON Schema validation first, extensible to HTTP, SFTP, CSV, XML, and legacy adapters.
+**Validate interface data locally, see every finding, and export a reproducible report.**
 
-The project accompanies the German [tiny-tool.de project page](https://tiny-tool.de/) and documents the development from the initial idea to a practical, automatable tool.
+[English](README.md) · [Deutsch](README.de.md) · [Examples](docs/examples/README.md) · [Changelog](CHANGELOG.md) · [Apache 2.0](LICENSE)
 
-## Status
+Java 21 · Desktop GUI and headless CLI · CSV, JSON and fixed-width files · HTTP/SFTP via CLI
 
-Iteration 4 is complete. The current mainline validates local JSON, CSV, fixed-width, HTTP, and key-authenticated SFTP exchanges with one shared result contract.
+The same JSON rules work in the desktop application and in automated runs.
+The ready-to-use bicycle rental data is synthetic; you can try a successful
+check and a failing check without preparing any files.
 
-The first iteration is deliberately small:
+## Current status
 
-- validate a local JSON document against a local JSON Schema Draft 2020-12 schema;
-- report all structural findings with stable paths and keywords;
-- provide readable text output and a machine-readable JSON report;
-- return deterministic exit codes for scripts and CI;
-- run offline without contacting a remote schema or service;
-- verify tests, packaging, and the executable JAR in GitHub Actions.
+Development snapshot: **0.1.0-SNAPSHOT**, documentation updated **2026-10-20**.
+This is not a production-release or certification claim.
 
-The implemented CLI command is:
+| Capability | Desktop GUI | CLI |
+|---|---|---|
+| Local JSON Schema Draft 2020-12 | Yes | Yes |
+| CSV / fixed-width validation | Yes | Yes |
+| Synthetic bicycle-rental example with profile | Yes, selected by default | `--profile` |
+| Local ROL POS / Relex profile | Yes, when bundled locally | `--preset relex` |
+| Visual CSV rule editor | Yes | Export/edit profile JSON |
+| LED status, findings and details | Yes | Text / JSON report |
+| Save reports as UTF-8 JSON / text | Yes | `--report-file` |
+| HTTP / SFTP adapters | Blocked | Available; blocked by `--local-only` |
 
-```text
-java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
-  --schema path/to/schema.json \
-  --input path/to/input.json \
-  --report json
+## See it in action
+
+Run `.\mvnw.cmd -B package`, then `java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar gui`.
+The first screenshot shows the default example after **Validate now**; the
+second shows the [deliberately invalid CSV](docs/examples/fictional-bicycle-rentals-invalid.csv)
+checked with the **same JSON profile**.
+
+| Valid example | Invalid example |
+|---|---|
+| [![Desktop GUI with a valid bicycle rental CSV](docs/images/gui-valid-en.png)](docs/images/gui-valid-en.png) | [![Desktop GUI with five findings from the invalid bicycle rental CSV](docs/images/gui-invalid-de.png)](docs/images/gui-invalid-de.png) |
+
+The screenshots were captured from the running Swing application by the GUI
+test. Click either image for full resolution. The validator's finding messages
+currently appear in German even when the GUI language is English.
+
+The current working example is deliberately local and self-contained: select
+the bundled bicycle-rental CSV, validate it with its matching profile, switch
+the interface language if desired, and export the same result as JSON or text.
+The companion article [Iteration 7: desktop GUI and local validation](https://tiny-tool.de/interface-testing-iteration-7-desktop-gui/)
+walks through that successful first run and the deliberately invalid example.
+
+### Validation flow
+
+```mermaid
+flowchart LR
+    A[CSV or JSON data file] --> C[Local validator]
+    B[Matching JSON rules] --> C
+    C --> D{Rules satisfied?}
+    D -->|Yes| E[VALID · exit 0]
+    D -->|No| F[INVALID · findings · exit 1]
+    E --> G[Text or JSON report]
+    F --> G
+    G --> H[Local reports/ directory]
 ```
 
-Exit codes are deterministic: `0` means valid, `1` means validation failed, and `2` means an operational or command error. The JSON report contract is documented in [`docs/contracts/validation-report-v1.md`](docs/contracts/validation-report-v1.md); an invalid example is available at [`docs/examples/validation-report-invalid-wrong-type.json`](docs/examples/validation-report-invalid-wrong-type.json).
+### What each JSON file does
 
-SFTP profiles are the one-remote-file extension in Iteration 4. They verify a stable remote snapshot, optionally compare SHA-256, download into a temporary directory, delegate content validation to the existing JSON, CSV, or fixed-width adapter, and can move invalid deliveries into a configured remote quarantine directory. FTP, XML, YAML-specific syntax, semantic rules, and multi-file remote workflows remain intentionally out of scope.
-
-## Technology baseline
-
-- Java 21 as the minimum runtime;
-- Apache Maven with Maven Wrapper;
-- one Maven module for the first iteration;
-- Jackson 2.x for JSON data handling;
-- NetworkNT JSON Schema Validator 2.x for JSON Schema Draft 2020-12;
-- Apache Commons CSV 1.14.1 for quoted, delimited text parsing;
-- JDK `java.net.http.HttpClient` for the bounded HTTP adapter;
-- JSch 2.28.7 for the bounded, key-authenticated SFTP adapter;
-- Apache MINA SSHD 2.16.0 in test scope for an embedded SFTP integration server;
-- Picocli for the command-line interface;
-- JUnit and AssertJ for tests;
-- no Spring Boot dependency in the core or CLI.
-
-The core uses project-owned result objects and ports. JSON parsing, schema validation, reporting, and future transports remain replaceable adapters.
-
-## Quick start: first successful run
-
-The repository is built for Java 21. Maven itself does not need to be installed:
-the checked-in Maven Wrapper downloads the configured Maven distribution on the
-first run. From the repository root, use one of these commands.
-
-On Windows PowerShell:
-
-```text
-mvnw.cmd -B test
-java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
-  --input-format json \
-  --schema src/test/resources/fixtures/delivery.schema.json \
-  --input src/test/resources/fixtures/valid-delivery.json \
-  --report json
+```mermaid
+flowchart TB
+    P[*.csv-profile.json<br/>Rules for CSV columns and values] --> V[Validation]
+    C[*.csv<br/>Data to inspect] --> V
+    V --> R[*.report.json<br/>Result and findings]
+    S[*.schema.json<br/>Rules for a JSON data file] --> J[JSON validation]
+    I[*.json<br/>JSON data to inspect] --> J
+    J --> R
 ```
 
-On macOS or Linux:
+The existing SFTP work covers an exact remote file (v1), bounded polling of a
+remote directory with exactly one matching regular file (v2), and a correlated
+delivery with an optional companion file (v3). V3 adds delivery identity,
+atomic claim and recovery, success archiving, and lifecycle metadata in the
+report. All versions verify a stable remote snapshot, can compare SHA-256,
+download into a temporary directory, and delegate content checks to JSON, CSV,
+or fixed-width validation. See the [v2 contract](docs/contracts/sftp-profile-v2.md)
+and [v3 contract](docs/contracts/sftp-profile-v3.md). These CLI features remain
+outside the local GUI workflow.
 
-```text
-./mvnw -B test
-java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate \
-  --input-format json \
-  --schema src/test/resources/fixtures/delivery.schema.json \
-  --input src/test/resources/fixtures/valid-delivery.json \
-  --report json
+Keep customer data, local rule files and generated reports in the Git-ignored
+`data/` and `reports/` directories. The GUI validates local files only; use
+`--local-only` for offline CLI runs. Without that flag, HTTP/SFTP commands can
+contact configured endpoints. Transport tests should use a local test instance.
+
+## Requirements and build
+
+- JDK **21 or newer** on `PATH`; Swing is included in the JDK.
+- The checked-in Maven Wrapper supplies Maven; no separate Maven installation.
+- Network access is needed for initial Maven/dependency downloads, not for
+  subsequent local validation. No browser, webserver, Node.js or GUI package.
+- Archives must be extracted separately; 7-Zip is optional if CSVs are available.
+
+Windows PowerShell, from the repository root:
+
+```powershell
+.\mvnw.cmd -B package
 ```
 
-The first command ends with a successful test summary. The second command
-prints a `VALID` JSON report and exits with `0`. The repository only requires a
-JDK 21 installation and network access for the initial Maven distribution and
-dependency downloads.
+This runs tests and produces the executable, dependency-bundled
+`target\zeus-interface-quality-0.1.0-SNAPSHOT.jar`. `test` alone does **not**
+produce that JAR. Rebuild after changing code or the bundled profile.
 
-## Command shape
+For subsequent offline builds, after dependencies have been cached:
 
-```text
-zeus-interface-quality validate \
-  --schema path/to/schema.json \
-  --input path/to/input.json
+```powershell
+.\mvnw.cmd -B dependency:go-offline
+.\mvnw.cmd -o -B package
 ```
 
-The exact result contract is documented in `docs/contracts/validation-report-v1.md` and is independent of the transport used to start a validation run.
+On macOS/Linux use the checked-in `mvnw` script instead. Command examples below
+use **Windows PowerShell** paths and syntax; do not mix Bash `\` continuation,
+Command Prompt `^` continuation and PowerShell syntax.
 
-`--input-format AUTO` is the default. The CLI reads the profile `format`
-field and selects JSON Schema, CSV, fixed-width, HTTP, or SFTP. Explicit
-`--input-format json|csv|fixed-width|http|sftp` still overrides detection.
-`--profile` is an alias for `--schema`.
+## Desktop: interactive validation
 
-Version 1 CSV profiles define the encoding, one-character delimiter, exact
-header order, and column rules for strings, integers, decimals, e-mail
-addresses, required values, min/max length, min/max numeric bounds, and
-regular expressions. Additional columns and malformed records use the same
-VALID/INVALID result contract; syntactically broken CSV files remain
-operational errors with exit 2.
+Double-click [start-gui.cmd](start-gui.cmd), or after building run:
 
-Fixed-width input uses `--input-format fixed-width` or a profile with
-`format: fixed-width`. Profiles define `recordLength` and one-based column
-positions. `sourceLanguage` may document COBOL, RPG, or another origin; it
-does not select a language-specific parser. Positions are measured in decoded
-characters. An empty fixed-width file is INVALID (`minRecords`).
-
-SFTP input uses `--input-format sftp` or a profile with `format: sftp`. The
-profile is passed as `--schema` or `--profile`; `--input` is deliberately not
-used because the adapter obtains exactly one remote file. `known_hosts` and
-the private key must be regular files below the profile directory. Host-key
-checking is strict, authentication is key-only, and an optional passphrase is
-read from an environment variable. Before download, the adapter checks that
-the remote path is a regular file and that its size and modification time stay
-stable for the configured number of observations. The downloaded snapshot is
-then checked against an optional SHA-256 value and delegated to the selected
-JSON, CSV, or fixed-width validator. See
-[`docs/contracts/sftp-profile-v1.md`](docs/contracts/sftp-profile-v1.md) and
-[`docs/iterations/iteration-4-sftp.md`](docs/iterations/iteration-4-sftp.md).
-
-An invalid content or hash result has exit code `1` and a report. An invalid
-profile, unavailable SFTP server, unstable file after bounded retries, or
-other operational failure has exit code `2`. Quarantine is opt-in and is only
-attempted after an invalid content or hash result; valid files are not moved.
-The checked-in file [`docs/examples/sftp-profile.json`](docs/examples/sftp-profile.json)
-is a configuration template, not a self-contained local demo: it requires a
-real endpoint, a matching `known_hosts` file, a private key, and the local
-content profile described in [`docs/examples/README.md`](docs/examples/README.md).
-The first SFTP success path that works offline is
-`mvnw.cmd -B -Dtest=SftpValidatorTest test` (or `./mvnw -B -Dtest=SftpValidatorTest test`).
-
-## Input and schema checks
-
-Each file must contain exactly one JSON document. Empty files, trailing content, and duplicate object keys are operational errors (exit `2`). These checks also apply to referenced schema files. Schemas are checked against the bundled Draft 2020-12 meta-schema before use.
-
-Schema references are restricted to regular files inside the real directory of the selected root schema. Both normalized paths and resolved symlink targets are checked. References to remote hosts are rejected before retrieval. Use a controlled local schema directory; this CLI is not a sandbox for hostile inputs or concurrently modified files.
-
-Finding messages use German to preserve the published v1 example independently of the host locale. Automation should use `status`, paths, and `keyword`; message wording can change with a deliberate validator upgrade.
-
-CSV profiles are deliberately a small adapter contract, not a replacement for
-JSON Schema. The profile format can evolve independently, and future adapters
-can use their own native schemas while returning the same project-owned result
-objects.
-
-The fixed-width profile is likewise an adapter-specific contract. It makes
-legacy layout assumptions explicit without pretending to parse COBOL- or
-RPG-Quelltexte. DDL-to-profile generation, transport access, and fachliche
-Mehrdatei-Regeln remain topics for later iterations.
-
-HTTP profiles combine a local JSON request schema, an HTTP method and URL,
-an expected response status, optional response-header requirements, and a
-local JSON response schema. The request body is validated before the network
-call. A response with the wrong status, headers, or body is `INVALID`; a
-timeout, connection failure, malformed profile, or malformed request is an
-operational error with exit code `2`. Redirects are not followed and all
-schema references remain local to the profile directory. See
-[`docs/contracts/http-profile-v1.md`](docs/contracts/http-profile-v1.md) and
-[`docs/iterations/iteration-3-http.md`](docs/iterations/iteration-3-http.md).
-
-## Build
-
-The Maven Wrapper is part of the repository setup. The build commands are:
-
-```text
-./mvnw test
+```powershell
+java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar gui
 ```
 
-On Windows:
+The launcher builds a missing JAR with tests skipped for startup. It does not
+rebuild an existing JAR or replace a full tested build.
 
-```text
-mvnw.cmd test
+On Linux or macOS, start the same GUI from a graphical session with:
+
+```sh
+./start-gui.sh
 ```
 
-## License
+The POSIX launcher checks for JDK 21 or newer, builds a missing JAR with the
+Maven Wrapper, and passes additional arguments to the GUI. It requires an
+available desktop display; use the headless CLI on servers without a display.
 
-The open-source license will be fixed before the first public release.
+1. The bicycle-rental example CSV and its matching JSON profile are selected
+   when the GUI opens. Click **Validate now** to try them immediately.
+2. To check another local CSV, JSON or fixed-width file, choose a data file and
+   its JSON rule file. For local Relex CSVs, select **Local Relex profile (in JAR)**
+   and then choose the CSV. The option appears only if the local profile was
+   bundled when the JAR was built.
+3. Optionally open **Configure CSV rules**. Saving creates an editable
+   JSON profile under `data/` by default; the example profile is not
+   overwritten.
+4. Click **Validate now** or press **Ctrl+Enter**. Validation runs in the
+   background. Input/profile changes are disabled until the operation finishes.
+5. Select a finding to see the full message, data path, profile path and rule.
+6. Choose TEXT or JSON and click **Save result**. The chooser starts in
+   the ignored local `reports/` directory.
+
+The JSON file beside the example CSV is a **rule profile**: it defines columns,
+types and checks for that CSV. A JSON Schema such as
+[`delivery.schema.json`](docs/examples/delivery.schema.json) instead defines
+rules for a JSON data file. A JSON file saved under `reports/` is the **result**
+of a completed validation, never the rule file to select above.
+
+Use the **Language** selector in the header to switch between English and
+German without losing the current result. The TT banner opens
+[tiny-tool.de](https://tiny-tool.de/) in the system's default browser.
+Validation finding messages come from the selected validator and can still be
+in German.
+
+| LED | Meaning |
+|---|---|
+| Grey | No current validation result |
+| Amber | Validation running |
+| Green | Valid against the selected profile |
+| Red | Invalid data or operational error, distinguished by text |
+
+Small input/profile LEDs indicate **file existence only**, not content validity.
+Color is supplemented by text. Changing input/profile clears the previous
+result and disables its report export. Saving reports protects input/profile
+files (including existing aliases); replacing another report requires GUI
+confirmation. No graphical desktop: `gui` reports an error and exits with `2`.
+
+## Configure once, use in both interfaces
+
+The visual CSV editor supports encoding, delimiter, decimal separator,
+BOF/EOF markers, row-count bounds and a composite uniqueness key. For each
+column, edit its name, enabled/required switches, type, string lengths, numeric
+bounds and regex. Add/remove column definitions to match the layout.
+
+Supported value types: `string`, `integer`, `decimal`, `email`, `date`, `time`.
+Disabling a column's value rules does not remove the column or bypass the
+header, column-count or explicit uniqueness checks. Invalid configurations
+are rejected, including disabled columns with invalid rules.
+
+Export an editable preset without opening a GUI:
+
+```powershell
+java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar profile --preset relex --output .\data\team-profile.json
+```
+
+Export refuses to overwrite an existing file. Edit the JSON or open it in the
+GUI. Then use `--profile .\data\team-profile.json` for automation.
+The [CSV profile contract](docs/contracts/csv-profile-v1.md) defines all defaults,
+empty-value handling, precision patterns and exact-string uniqueness.
+JSON Schema and fixed-width profiles can also be supplied as local files;
+the visual rule editor is specifically for CSV.
+
+## CLI and build pipelines
+
+The CLI starts no window and works on headless build agents:
+
+```powershell
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\fictional-bicycle-rentals.csv-profile.json --input .\docs\examples\fictional-bicycle-rentals.csv --local-only --report json
+```
+
+This [synthetic CSV and profile pair](docs/examples/README.md#synthetic-csv-example)
+returns `VALID` and exit `0`. To see findings and create a local report, run
+the invalid example with the same rules:
+
+```powershell
+New-Item -ItemType Directory -Force .\reports | Out-Null
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\fictional-bicycle-rentals.csv-profile.json --input .\docs\examples\fictional-bicycle-rentals-invalid.csv --local-only --report json --report-file .\reports\fictional-bicycle-rentals-invalid.report.json
+$LASTEXITCODE  # 1: validation completed with findings
+```
+
+The file contains five findings: a minimum violation, an invalid date, a
+duplicate rental ID, an unsupported bike type and an invalid email. Inspect
+`reports/fictional-bicycle-rentals-invalid.report.json` for the data path,
+rule path and message of each finding. The report stays in the local project.
+
+Self-contained JSON example using checked-in synthetic data:
+
+```powershell
+java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
+```
+
+| Option / command | Behavior |
+|---|---|
+| `validate --profile PATH` / `--schema PATH` | Local profile or JSON Schema; exactly one profile source is required |
+| `validate --preset relex` | Bundled CSV profile, no external profile path needed; mutually exclusive with `--profile` |
+| `--input PATH` | Required for local formats; not used for SFTP |
+| `--input-format` | `auto` (default), `json`, `csv`, `fixed-width`, `http`, `sftp`; explicit choice overrides detection |
+| `--local-only` | Rejects HTTP/SFTP formats and profiles before transport access |
+| `--report text\|json` | stdout format; default TEXT |
+| `--report-file PATH` | Also writes the same report as UTF-8; parent directory must exist |
+| `profile --preset relex [--output PATH]` | Exports preset to a new file, or stdout if no output path |
+| `gui`, `--help`, `validate --help` | Desktop entry point / command help |
+
+`--preset relex` accepts only `auto` or `csv` input format. Arguments are
+non-interactive: configuration/file errors never prompt for user input.
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Validation succeeded |
+| `1` | Validation completed with rule violations |
+| `2` | Operational/configuration/command error |
+
+Text/JSON reports go to stdout; operational diagnostics go to stderr.
+Report-file writes protect input/profile and replace other existing reports.
+Write errors return `2` without printing a successful validation report.
+On an operational failure an old report may remain: **always check the exit
+code**, not just the existence of a report file.
+The stable [report contract](docs/contracts/validation-report-v1.md) is unchanged.
+Finding messages are generally German; automation should use status, paths
+and rule keywords, not localized wording.
+
+Example local PowerShell pipeline script, stopping on the first nonzero result:
+
+```powershell
+.\mvnw.cmd -o -B package
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$jar = '.\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar'
+$files = @(
+    '.\data\first.csv',
+    '.\data\second.csv'
+)
+foreach ($file in $files) {
+  $report = Join-Path '.\target' ((Get-Item -LiteralPath $file).BaseName + '.report.json')
+  java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-profile.json' --input $file --local-only --report json --report-file $report
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+exit 0
+```
+
+Multiple files are separate CLI invocations, not a built-in batch or cross-file
+comparison command. Replace the placeholder file names with your local CSVs
+and the matching rule file. `exit` is intended for a pipeline script.
+
+## Additional adapters and boundaries
+
+- JSON: exactly one document; duplicate keys, trailing content and malformed
+  input/schema are operational errors. Draft 2020-12 meta-validation and schema
+  references restricted to regular files inside the root schema directory;
+  remote references rejected.
+- Fixed-width: one-based character positions, record length and scalar rules;
+  empty input is invalid. `sourceLanguage` documents origin, not a source parser.
+- [HTTP](docs/contracts/http-profile-v1.md): optional JSON request validation,
+  expected status/headers and JSON response validation; no redirects.
+- [SFTP](docs/contracts/sftp-profile-v1.md): one stable file, strict host keys,
+  key authentication, optional hash and opt-in quarantine. The
+  [v2](docs/contracts/sftp-profile-v2.md) and
+  [v3](docs/contracts/sftp-profile-v3.md) contracts cover directory selection
+  and correlated delivery lifecycle.
+- FTP, XML, YAML-specific syntax and general multi-file business rules are not
+  implemented. The CLI is not a sandbox for hostile or concurrently modified files.
+
+## Documentation and development
+
+- [German guide](README.de.md), [bilingual changelog](CHANGELOG.md)
+- CSV contract: [English](docs/contracts/csv-profile-v1.md) / [German](docs/contracts/csv-profile-v1.de.md)
+- Examples: [English](docs/examples/README.md) / [German](docs/examples/README.de.md)
+- Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
+- [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
+  historical records; their scope statements and test counts describe those
+  iterations, not the current feature set.
+
+One Maven module, Java 21 bytecode target, Jackson, NetworkNT, Commons CSV,
+Picocli, JSch and JUnit/AssertJ; Apache MINA SSHD supplies a local SFTP test
+server. See [pom.xml](pom.xml) for dependency versions. No Spring Boot.
+Headless builds skip graphical smoke tests, not the local validator/CLI tests.
+Tests use synthetic fixtures or local test endpoints, not production SFTP.
+
+## Troubleshooting
+
+- **Old GUI or missing changes:** rebuild with `.\mvnw.cmd -B package`; the
+  launcher reuses an existing JAR.
+- **Cannot find the JAR:** run `package`, not only `test`, from the repository root.
+- **Archive selected:** choose the extracted CSV, not `.7z`/`.zip`.
+- **PowerShell JVM option error:** keep `'-Djava.awt.headless=true'` quoted.
+- **SLF4J provider warning:** the packaged JSON validator can print
+  `No SLF4J providers were found` to stderr. This warning alone is not a
+  validation failure; use the report on stdout and the process exit code.
+- **Unexpectedly empty report or old file:** inspect stderr and exit code `2`;
+  verify that the target directory exists and input/profile are not the target.
+
+## License and authorship
+
+Copyright 2026 [tiny-tool.de](https://tiny-tool.de/). The project is licensed
+under the [Apache License, Version 2.0](LICENSE); see [NOTICE](NOTICE).
+Dependencies retain their own licenses and attribution notices.

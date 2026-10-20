@@ -1,3 +1,11 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.report;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +50,23 @@ class JsonReportWriterTest {
         assertThat(report.get("findings")).hasSize(1);
         assertThat(report.get("findings").get(0).fieldNames()).toIterable()
                 .containsExactly("instancePath", "schemaPath", "keyword", "message");
+    }
+
+    @Test
+    void writesOptionalOperationalMetadataWithoutChangingTheCoreFields() throws Exception {
+        ValidationResult result = ValidationResult.valid(Map.of(
+                "deliveryId", "D-100",
+                "filesValidated", 2,
+                "lifecycle", "ARCHIVED"));
+
+        JsonNode report = objectMapper.readTree(new JsonReportWriter().write(result));
+
+        assertThat(report.get("status").asText()).isEqualTo("VALID");
+        assertThat(report.get("valid").asBoolean()).isTrue();
+        assertThat(report.get("findings")).isEmpty();
+        assertThat(report.get("metadata").get("deliveryId").asText()).isEqualTo("D-100");
+        assertThat(report.get("metadata").get("filesValidated").asInt()).isEqualTo(2);
+        assertThat(report.get("metadata").get("lifecycle").asText()).isEqualTo("ARCHIVED");
     }
 
     private static InputStream expectedReport() {

@@ -1,0 +1,4 @@
+"BOF";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";""
+"PRODUKTCODE";"STANDORTCODE";"DATUM";"ZEIT";"VERKAUFSWERT";"RABATT_PROZENT";"RABATTGRUND";"PARTNER_CODE";"URSPR_VERKAUFSWERT";"BESTELLTYP";"WERT";"VERKAUFSMENGE";"MENGE";"FULFILLMENT_TYP";"KAMPAGNENCODE";"VERSANDDATUM";"NR_LISTENZEILE";"QUITTUNGSCODE"
+"123456";"10";"2026-10-01";"12:17";"-3,35";",30";"Test-Coupon";"B2C";"3,35";"Test";"-3,35";"-1,000";"-1,000";"Lieferungen";"";"";"1";"12345"
+"EOF";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";""

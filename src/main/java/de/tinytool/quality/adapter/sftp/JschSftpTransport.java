@@ -1,3 +1,11 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.adapter.sftp;
 
 import com.jcraft.jsch.ChannelSftp;
@@ -11,6 +19,7 @@ import de.tinytool.quality.adapter.support.LocalFiles;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 /** JSch-backed SFTP transport with strict known-host verification. */
 final class JschSftpTransportFactory implements SftpTransportFactory {
@@ -88,6 +97,25 @@ final class JschSftpTransport implements SftpTransport {
     }
 
     @Override
+    public List<SftpRemoteEntry> list(String remoteDirectory) throws SftpTransferException {
+        try {
+            return channel.ls(remoteDirectory).stream()
+                    .filter(entry -> !entry.getFilename().equals(".")
+                            && !entry.getFilename().equals(".."))
+                    .map(entry -> new SftpRemoteEntry(
+                            entry.getFilename(),
+                            new SftpRemoteMetadata(
+                                    entry.getAttrs().getSize(),
+                                    entry.getAttrs().getMTime(),
+                                    !entry.getAttrs().isDir())))
+                    .toList();
+        } catch (SftpException e) {
+            throw new SftpTransferException(
+                    "Could not list remote SFTP directory: " + LocalFiles.safeMessage(e), e);
+        }
+    }
+
+    @Override
     public void download(String remotePath, Path localPath) throws SftpTransferException {
         try (var output = Files.newOutputStream(localPath)) {
             channel.get(remotePath, output, null);
@@ -106,7 +134,7 @@ final class JschSftpTransport implements SftpTransport {
             channel.rename(remotePath, targetPath);
         } catch (SftpException e) {
             throw new SftpTransferException(
-                    "Could not move remote SFTP file to quarantine: "
+                    "Could not move remote SFTP file: "
                             + LocalFiles.safeMessage(e), e);
         }
     }

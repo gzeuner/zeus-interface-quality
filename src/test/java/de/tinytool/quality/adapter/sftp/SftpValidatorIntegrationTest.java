@@ -1,3 +1,11 @@
+/*
+ * Author: tiny-tool.de
+ * Copyright 2026 tiny-tool.de
+ * SPDX-License-Identifier: Apache-2.0
+ * Licensed under the Apache License, Version 2.0.
+ * See LICENSE or https://www.apache.org/licenses/LICENSE-2.0.
+ */
+
 package de.tinytool.quality.adapter.sftp;
 
 import org.apache.sshd.common.keyprovider.KeyPairProvider;
@@ -40,6 +48,8 @@ class SftpValidatorIntegrationTest {
         remoteRoot = temporaryDirectory.resolve("remote-root");
         profileDirectory = temporaryDirectory.resolve("profile");
         Files.createDirectories(remoteRoot.resolve("inbox"));
+        Files.createDirectories(remoteRoot.resolve("claim"));
+        Files.createDirectories(remoteRoot.resolve("archive"));
         Files.createDirectories(remoteRoot.resolve("quarantine"));
         Files.createDirectories(profileDirectory);
 
@@ -104,6 +114,37 @@ class SftpValidatorIntegrationTest {
                 .anyMatch(path -> path.getFileName().toString().startsWith("delivery.json."));
     }
 
+    @Test
+    void selectsOneMatchingFileFromRemoteDirectoryThroughRealJschTransport() throws Exception {
+        Files.writeString(remoteRoot.resolve("inbox/delivery-20260928.json"),
+                "{\"deliveryId\":\"D-101\",\"quantity\":3}");
+
+        var result = new SftpValidator().validate(null, writeDirectoryProfile());
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(Files.exists(remoteRoot.resolve("inbox/delivery-20260928.json"))).isTrue();
+    }
+
+    @Test
+    void correlatesClaimsAndArchivesTwoFilesThroughRealJschTransport() throws Exception {
+        Files.writeString(remoteRoot.resolve("inbox/delivery-D-200.json"),
+                "{\"deliveryId\":\"D-200\",\"quantity\":5}");
+        Files.writeString(remoteRoot.resolve("inbox/delivery-D-200.meta.json"),
+                "{\"deliveryId\":\"D-200\",\"quantity\":5}");
+
+        var result = new SftpValidator().validate(
+                null, writeLifecycleProfile());
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.metadata())
+                .containsEntry("deliveryId", "D-200")
+                .containsEntry("filesValidated", 2)
+                .containsEntry("lifecycle", "ARCHIVED");
+        assertThat(listFiles(remoteRoot.resolve("inbox"))).isEmpty();
+        assertThat(listFiles(remoteRoot.resolve("claim"))).isEmpty();
+        assertThat(listFiles(remoteRoot.resolve("archive"))).hasSize(2);
+    }
+
     private void writeProfile() throws IOException {
         Files.writeString(profileDirectory.resolve("sftp-profile.json"), """
                 {
@@ -125,6 +166,60 @@ class SftpValidatorIntegrationTest {
                   "connectTimeoutSeconds": 5
                 }
                 """.formatted(server.getPort(), USERNAME, REMOTE_FILE));
+    }
+
+    private Path writeDirectoryProfile() throws IOException {
+        Path profile = profileDirectory.resolve("sftp-directory-profile.json");
+        Files.writeString(profile, """
+                {
+                  "format": "sftp",
+                  "version": 2,
+                  "host": "127.0.0.1",
+                  "port": %d,
+                  "username": "%s",
+                  "remoteDirectory": "/inbox",
+                  "filePattern": "^delivery-[0-9]{8}\\\\.json$",
+                  "knownHosts": "known_hosts",
+                  "privateKey": "id_ed25519",
+                  "contentFormat": "json",
+                  "contentProfile": "delivery.schema.json",
+                  "stabilityChecks": 1,
+                  "stabilityDelaySeconds": 0,
+                  "maxAttempts": 1,
+                  "retryDelaySeconds": 0,
+                  "connectTimeoutSeconds": 5
+                }
+                """.formatted(server.getPort(), USERNAME));
+        return profile;
+    }
+
+    private Path writeLifecycleProfile() throws IOException {
+        Path profile = profileDirectory.resolve("sftp-lifecycle-profile.json");
+        Files.writeString(profile, """
+                {
+                  "format": "sftp",
+                  "version": 3,
+                  "host": "127.0.0.1",
+                  "port": %d,
+                  "username": "%s",
+                  "remoteDirectory": "/inbox",
+                  "filePattern": "^delivery-D-[0-9]+\\\\.json$",
+                  "companionPattern": "^delivery-D-[0-9]+\\\\.meta\\\\.json$",
+                  "deliveryIdPattern": "^delivery-(?<deliveryId>D-[0-9]+)(?:\\\\.meta)?\\\\.json$",
+                  "claimRemoteDirectory": "/claim",
+                  "archiveRemoteDirectory": "/archive",
+                  "knownHosts": "known_hosts",
+                  "privateKey": "id_ed25519",
+                  "contentFormat": "json",
+                  "contentProfile": "delivery.schema.json",
+                  "stabilityChecks": 1,
+                  "stabilityDelaySeconds": 0,
+                  "maxAttempts": 1,
+                  "retryDelaySeconds": 0,
+                  "connectTimeoutSeconds": 5
+                }
+                """.formatted(server.getPort(), USERNAME));
+        return profile;
     }
 
     private static KeyPair generateRsaKeyPair() throws Exception {

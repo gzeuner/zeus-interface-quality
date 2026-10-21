@@ -11,8 +11,8 @@ file. The first run should be local, visible, and reproducible.
 ## Delivered slice
 
 - Added a local Swing desktop entry point through `gui` and `start-gui.cmd`.
-- Added a bundled synthetic bicycle-rental CSV and matching CSV profile as the
-  default selection.
+- Added a bundled bicycle-rental sample from the test lab and matching CSV
+  profile as the default selection.
 - Added background validation with input/profile controls locked while a run
   is active.
 - Added LEDs for idle, running, valid, invalid, and error states, plus separate

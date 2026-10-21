@@ -16,7 +16,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SyntheticCsvExampleTest {
+class CsvExampleTest {
 
     private static final Path CSV = Path.of("docs", "examples", "fictional-bicycle-rentals.csv");
     private static final Path INVALID_CSV = Path.of("docs", "examples", "fictional-bicycle-rentals-invalid.csv");

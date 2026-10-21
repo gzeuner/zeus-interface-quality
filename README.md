@@ -9,8 +9,8 @@
 Java 21 · Desktop GUI and headless CLI · CSV, JSON and fixed-width files · HTTP/SFTP via CLI
 
 The same JSON rules work in the desktop application and in automated runs.
-The ready-to-use bicycle rental data is synthetic; you can try a successful
-check and a failing check without preparing any files.
+The ready-to-use bicycle-rental example comes from our test lab; you can try
+a successful check and a failing check without preparing any files.
 
 ## Current status
 
@@ -21,7 +21,7 @@ This is not a production-release or certification claim.
 |---|---|---|
 | Local JSON Schema Draft 2020-12 | Yes | Yes |
 | CSV / fixed-width validation | Yes | Yes |
-| Synthetic bicycle-rental example with profile | Yes, selected by default | `--profile` |
+| Bicycle-rental example from the test lab with profile | Yes, selected by default | `--profile` |
 | Local CSV profile example | Yes, selected by default | `--profile` |
 | Visual CSV rule editor | Yes | Export/edit profile JSON |
 | LED status, findings and details | Yes | Text / JSON report |
@@ -42,6 +42,14 @@ checked with the **same JSON profile**.
 The screenshots were captured from the running Swing application by the GUI
 test. Click either image for full resolution. The validator's finding messages
 currently appear in German even when the GUI language is English.
+
+### Validation details
+
+After selecting a finding, the detail view shows the complete message, data
+path, profile path, and applied rule. The view remains generic and works with
+any selected local JSON Schema or CSV profile.
+
+[![Validation details with data path, profile path, and rule](docs/images/gui-invalid-de.png)](docs/images/gui-invalid-de.png)
 
 The current working example is deliberately local and self-contained: select
 the bundled bicycle-rental CSV, validate it with its matching profile, switch
@@ -85,7 +93,7 @@ or fixed-width validation. See the [v2 contract](docs/contracts/sftp-profile-v2.
 and [v3 contract](docs/contracts/sftp-profile-v3.md). These CLI features remain
 outside the local GUI workflow.
 
-Keep customer data, local rule files and generated reports in the Git-ignored
+Keep local input files, rule files and generated reports in the Git-ignored
 `data/` and `reports/` directories. The GUI validates local files only; use
 `--local-only` for offline CLI runs. Without that flag, HTTP/SFTP commands can
 contact configured endpoints. Transport tests should use a local test instance.
@@ -145,6 +153,7 @@ available desktop display; use the headless CLI on servers without a display.
 2. To check another local CSV, JSON or fixed-width file, choose a data file and
    its JSON rule file. The supplied CSV profile is selected by default for the
    bundled example; choose another local profile when needed.
+   The GUI loads each selected local JSON Schema or profile dynamically.
 3. Optionally open **Configure CSV rules**. Saving creates an editable
    JSON profile under `data/` by default; the example profile is not
    overwritten.
@@ -191,6 +200,16 @@ Disabling a column's value rules does not remove the column or bypass the
 header, column-count or explicit uniqueness checks. Invalid configurations
 are rejected, including disabled columns with invalid rules.
 
+### Configure CSV rules
+
+The **Configure CSV rules** dialog makes the profile definition visible and
+editable: delimiter and decimal separator, encoding, BOF/EOF markers, row
+limits, uniqueness key, and the rules for each column. This makes it easy to
+adapt an existing CSV layout transparently before saving and using the profile
+for validation.
+
+[![Configure CSV rules in the desktop GUI](docs/images/gui-csv-rules-en.png)](docs/images/gui-csv-rules-en.png)
+
 Save an editable profile from the GUI, or copy a local JSON profile into `data/`.
 Then use `--profile .\data\team-profile.json` for automation.
 The [CSV profile contract](docs/contracts/csv-profile-v1.md) defines all defaults,
@@ -206,7 +225,7 @@ The CLI starts no window and works on headless build agents:
 java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\fictional-bicycle-rentals.csv-profile.json --input .\docs\examples\fictional-bicycle-rentals.csv --local-only --report json
 ```
 
-This [synthetic CSV and profile pair](docs/examples/README.md#synthetic-csv-example)
+This [CSV and profile pair from the test lab](docs/examples/README.md#csv-example-from-the-test-lab)
 returns `VALID` and exit `0`. To see findings and create a local report, run
 the invalid example with the same rules:
 
@@ -221,7 +240,7 @@ duplicate rental ID, an unsupported bike type and an invalid email. Inspect
 `reports/fictional-bicycle-rentals-invalid.report.json` for the data path,
 rule path and message of each finding. The report stays in the local project.
 
-Self-contained JSON example using checked-in synthetic data:
+Self-contained JSON example using checked-in sample data from the test lab:
 
 ```powershell
 java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
@@ -309,7 +328,7 @@ One Maven module, Java 21 bytecode target, Jackson, NetworkNT, Commons CSV,
 Picocli, JSch and JUnit/AssertJ; Apache MINA SSHD supplies a local SFTP test
 server. See [pom.xml](pom.xml) for dependency versions. No Spring Boot.
 Headless builds skip graphical smoke tests, not the local validator/CLI tests.
-Tests use synthetic fixtures or local test endpoints, not production SFTP.
+Tests use sample fixtures or local test endpoints, not production SFTP.
 
 ## Troubleshooting
 

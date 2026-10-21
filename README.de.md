@@ -9,7 +9,7 @@
 Java 21 · Desktop-GUI und headless CLI · CSV, JSON und Fixed-Width · HTTP/SFTP über CLI
 
 Dieselben JSON-Regeln funktionieren in der Desktop-Anwendung und in automatisierten
-Abläufen. Mit den synthetischen Fahrradverleihdaten lässt sich sofort ein
+Abläufen. Mit den Beispieldaten aus unserem Testlabor lässt sich sofort ein
 erfolgreicher und ein fehlerhafter Prüflauf ausprobieren.
 
 ## Aktueller Stand
@@ -21,7 +21,7 @@ Dies ist keine Aussage über eine Produktionsfreigabe oder Zertifizierung.
 |---|---|---|
 | Lokales JSON Schema Draft 2020-12 | Ja | Ja |
 | CSV / Fixed-Width prüfen | Ja | Ja |
-| Synthetisches Fahrradverleih-Beispiel mit Profil | Ja, vorausgewählt | `--profile` |
+| Fahrradverleih-Beispiel aus dem Testlabor mit Profil | Ja, vorausgewählt | `--profile` |
 | Lokales CSV-Profilbeispiel | Ja, vorausgewählt | `--profile` |
 | Visueller CSV-Regeleditor | Ja | Profil-JSON exportieren/bearbeiten |
 | LED-Status, Befunde und Details | Ja | Text-/JSON-Report |
@@ -43,6 +43,14 @@ mit **derselben JSON-Regeldatei**.
 Die Screenshots stammen aus der laufenden Swing-Anwendung und wurden im GUI-Test
 erstellt. Ein Klick öffnet die volle Auflösung. Die fachlichen Befundmeldungen
 sind derzeit auch bei englischer GUI auf Deutsch.
+
+### Prüfdetails
+
+Nach Auswahl eines Befunds zeigt die Detailansicht die vollständige Meldung,
+den Datenpfad, den Profilpfad und die angewendete Regel. Die Ansicht bleibt
+unabhängig vom gewählten lokalen JSON Schema oder CSV-Profil.
+
+[![Prüfdetails mit Datenpfad, Profilpfad und Regel](docs/images/gui-invalid-de.png)](docs/images/gui-invalid-de.png)
 
 Das aktuelle funktionierende Beispiel bleibt bewusst lokal und vollständig
 reproduzierbar: die mitgelieferte Fahrradverleih-CSV auswählen, mit dem
@@ -84,8 +92,8 @@ und Archivschritten (Profil v3). Siehe [SFTP-Vertrag v2](docs/contracts/sftp-pro
 und [SFTP-Vertrag v3](docs/contracts/sftp-profile-v3.md). Diese CLI-Funktionen
 gehören nicht zum lokalen GUI-Ablauf.
 
-Kundendaten, eigene Regeldateien und erzeugte Reports in den von Git ignorierten
-Ordnern `data/` und `reports/` halten. Die GUI prüft nur lokale Dateien; für
+Lokale Eingabedateien, eigene Regeldateien und erzeugte Reports in den von Git
+ignorierten Ordnern `data/` und `reports/` halten. Die GUI prüft nur lokale Dateien; für
 Offline-Abläufe der CLI `--local-only` verwenden. Ohne diesen Schalter können
 HTTP-/SFTP-Befehle konfigurierte Endpunkte kontaktieren. Transporttests gehören
 auf eine lokale Testinstanz.
@@ -149,6 +157,7 @@ verfügbare grafische Anzeige; auf Servern ohne Anzeige die headless CLI nutzen.
 2. Für andere lokale CSV-, JSON- oder Fixed-Width-Dateien Datendatei und
    zugehörige JSON-Regeldatei auswählen. Für das mitgelieferte Beispiel ist das
    passende CSV-Profil bereits vorausgewählt; eigene Profile lassen sich öffnen.
+   Die GUI lädt jedes ausgewählte lokale JSON Schema bzw. Profil dynamisch.
 3. Optional **CSV-Regeln konfigurieren** öffnen. Das Speichern legt ein
    bearbeitbares JSON-Profil standardmäßig unter `data/` an; das bestehende
    Beispielprofil wird dabei nicht überschrieben.
@@ -199,6 +208,16 @@ Deaktivierte Wertregeln entfernen die Spalte nicht und umgehen weder Kopfzeile,
 Spaltenanzahl noch einen expliziten Eindeutigkeitsschlüssel.
 Fehlerhafte Konfigurationen werden auch bei deaktivierten Spalten abgelehnt.
 
+### CSV-Regeln konfigurieren
+
+Der Dialog **CSV-Regeln konfigurieren** macht die Profildefinition sichtbar und
+bearbeitbar: Trenn- und Dezimalzeichen, Zeichensatz, BOF-/EOF-Marker,
+Datensatzgrenzen, Eindeutigkeitsschlüssel und die Regeln je Spalte. So lässt
+sich ein vorhandenes CSV-Layout nachvollziehbar anpassen, bevor das Profil
+gespeichert und für die Prüfung verwendet wird.
+
+[![CSV-Regeln konfigurieren in der Desktop-GUI](docs/images/gui-csv-rules-de.png)](docs/images/gui-csv-rules-de.png)
+
 Ein bearbeitbares Profil in der GUI speichern oder eine eigene JSON-Profildatei
 unter `data/` ablegen und danach mit `--profile .\data\team-profile.json`
 automatisiert verwenden.
@@ -215,7 +234,7 @@ Die CLI öffnet kein Fenster und funktioniert auf headless Build-Agents:
 java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\fictional-bicycle-rentals.csv-profile.json --input .\docs\examples\fictional-bicycle-rentals.csv --local-only --report json
 ```
 
-Dieses [synthetische CSV-/Profilpaar](docs/examples/README.de.md#synthetisches-csv-beispiel)
+Dieses [CSV-/Profilpaar aus dem Testlabor](docs/examples/README.de.md#csv-beispiel-aus-dem-testlabor)
 liefert `VALID` und Exit `0`. Für Befunde und einen lokalen Report wird die
 fehlerhafte CSV mit denselben Regeln geprüft:
 
@@ -230,7 +249,7 @@ nicht erlaubter Fahrradtyp und ungültige E-Mail-Adresse. Unter
 `reports/fictional-bicycle-rentals-invalid.report.json` stehen zu jedem Befund
 Datenpfad, Regelpfad und Meldung. Der Report bleibt lokal im Projekt.
 
-Eigenständiges JSON-Beispiel mit eingecheckten synthetischen Daten:
+Eigenständiges JSON-Beispiel mit eingecheckten Beispieldaten aus dem Testlabor:
 
 ```powershell
 java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
@@ -320,7 +339,7 @@ Ein Maven-Modul, Java-21-Bytecodeziel, Jackson, NetworkNT, Commons CSV, Picocli,
 JSch und JUnit/AssertJ; Apache MINA SSHD stellt einen lokalen SFTP-Testserver.
 Abhängigkeitsversionen stehen in [pom.xml](pom.xml). Kein Spring Boot.
 Headless Builds überspringen grafische Smoke-Tests, nicht Validator-/CLI-Tests.
-Tests verwenden synthetische Daten oder lokale Testendpunkte, kein produktives SFTP.
+Tests verwenden Beispieldaten oder lokale Testendpunkte, kein produktives SFTP.
 
 ## Fehlerbehebung
 

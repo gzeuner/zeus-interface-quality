@@ -3,10 +3,10 @@
 [Deutsch](README.de.md) | [English](README.md) | [Hauptanleitung](../../README.de.md)
 
 Die folgenden Befehle gelten für Windows PowerShell im Repository-
-Hauptverzeichnis nach `.\mvnw.cmd -B package`. CSV-Dateien mit Kundendaten
-und erzeugte Reports bleiben in den lokalen, von Git ignorierten Ordnern.
+Hauptverzeichnis nach `.\mvnw.cmd -B package`. Lokale CSV-Dateien und erzeugte
+Reports bleiben in den von Git ignorierten Ordnern.
 
-## Synthetisches CSV-Beispiel
+## CSV-Beispiel aus dem Testlabor
 
 [Fiktive Fahrradvermietungen](fictional-bicycle-rentals.csv) und das passende
 [CSV-Validierungsprofil](fictional-bicycle-rentals.csv-profile.json) sind
@@ -69,7 +69,7 @@ Dateien auswählen und **Jetzt prüfen** anklicken. Mit **CSV-Regeln
 konfigurieren** lässt sich ein bearbeitbares CSV-Profil erstellen;
 **Ergebnis speichern** exportiert die Befunde.
 
-## Synthetisches JSON-Beispiel
+## JSON-Beispiel aus dem Testlabor
 
 [delivery.schema.json](delivery.schema.json) ist ein kleines lokales Schema.
 Ein vollständig reproduzierbarer Lauf nutzt die eingecheckten Testfixtures:

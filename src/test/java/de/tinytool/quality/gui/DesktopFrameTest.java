@@ -17,6 +17,7 @@ import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
@@ -103,6 +104,27 @@ class DesktopFrameTest {
             assertThat(component("save", JButton.class).isEnabled()).isTrue();
         });
         saveScreenshot("gui-invalid-example.png");
+    }
+
+    @Test
+    void validatesAnotherJsonDocumentAndShowsDynamicFindingDetails() throws Exception {
+        String input = Path.of("src", "test", "resources", "fixtures", "invalid-wrong-type.json").toString();
+        String profile = Path.of("src", "test", "resources", "fixtures", "delivery.schema.json").toString();
+        SwingUtilities.invokeAndWait(() -> {
+            component("input", JTextField.class).setText(input);
+            component("profile", JTextField.class).setText(profile);
+            component("validate", JButton.class).doClick(0);
+        });
+        awaitResult();
+        SwingUtilities.invokeAndWait(() -> {
+            assertThat(component("status", JLabel.class).getText()).startsWith("UNGÜLTIG");
+            assertThat(component("findings", JTable.class).getRowCount()).isEqualTo(1);
+            assertThat(component("context", JLabel.class).getText()).contains("delivery.schema.json");
+            assertThat(component("findings", JTable.class).getValueAt(0, 0)).isEqualTo("/quantity");
+            assertThat(component("findings", JTable.class).getValueAt(0, 1)).isEqualTo("type");
+            assertThat(component("detail", JTextArea.class).getText())
+                    .contains("Datenpfad: /quantity", "Profilpfad:", "Regel: type");
+        });
     }
 
     @Test

@@ -15,7 +15,7 @@ implied by this entry.
 
 #### Added
 
-- Deliberately invalid synthetic bicycle-rental CSV with five verified findings
+- Deliberately invalid bicycle-rental sample from the test lab with five verified findings
   and a local JSON-report walkthrough using the existing rule file.
 - GUI screenshots captured during tests, workflow diagrams, and a refreshed
   English/German quick start.
@@ -26,14 +26,14 @@ implied by this entry.
   elapsed time and JSON/text report export.
 - LED indicators: idle/running/valid/invalid/error, with explanatory text;
   separate file-existence LEDs for input and profile.
-- Synthetic CSV example with an explicit local profile for repeatable workflows.
+- Test-lab CSV example with an explicit local profile for repeatable workflows.
 - Backward-compatible CSV options: `decimalSeparator`, `envelope`,
   `minRecords`, `maxRecords`, composite `uniqueBy` and per-column `enabled`.
   Shared scalar types now include `date` and `time`.
 - Visual CSV profile editor for portable configurations used unchanged by
   the GUI and CLI.
 - CLI `--report-file` and `--local-only` for repeatable local workflows.
-- Synthetic CSV fixtures, profile/pipeline tests, GUI smoke tests and
+- Sample CSV fixtures, profile/pipeline tests, GUI smoke tests and
   headless-process verification.
 - Separate English/German guides, examples, CSV/report/HTTP/SFTP contracts and this
   bilingual changelog.
@@ -54,17 +54,17 @@ implied by this entry.
 
 - Full offline build after the example and license update: 138 tests,
   0 failures, 0 errors, 2 skipped.
-- Synthetic invalid CSV: `INVALID`, five findings, exit `1`; JSON report saved
+- Invalid CSV sample: `INVALID`, five findings, exit `1`; JSON report saved
   only in the local ignored `reports/` directory.
 - Headless CLI exit codes `0`/`1`/`2`, report writing, GUI configuration and
   LED transitions, packaged GUI startup/shutdown.
-- No production SFTP access. Customer CSVs and reports remain local.
+- No production SFTP access in the local example path.
 
 ### Deutsch
 
 #### Hinzugefügt
 
-- Absichtlich fehlerhafte synthetische Fahrradverleih-CSV mit fünf geprüften
+- Absichtlich fehlerhafte Fahrradverleih-Beispieldatei aus dem Testlabor mit fünf geprüften
   Befunden und lokalem JSON-Report mit derselben Regeldatei.
 - GUI-Screenshots aus Tests, Ablaufgrafiken und überarbeiteter Schnellstart auf
   Deutsch und Englisch.
@@ -75,14 +75,14 @@ implied by this entry.
   und JSON-/Text-Reportexport.
 - LED-Anzeigen fuer bereit/laufend/gueltig/ungueltig/Fehler mit Klartext;
   separate Dateiexistenzanzeigen fuer Eingabe und Profil.
-- Synthetisches CSV-Beispiel mit einem ausdrücklichen lokalen Profil für
+- CSV-Beispiel aus dem Testlabor mit einem ausdrücklichen lokalen Profil für
   wiederholbare Abläufe.
 - Rueckwaertskompatible CSV-Optionen: `decimalSeparator`, `envelope`,
   `minRecords`, `maxRecords`, zusammengesetztes `uniqueBy` und `enabled`
   je Spalte. Gemeinsame skalare Typen um `date`/`time` erweitert.
 - Visueller CSV-Regeleditor fuer unveraendert in GUI/CLI verwendbare Profile.
 - CLI `--report-file` und `--local-only` für wiederholbare lokale Abläufe.
-- Synthetische CSV-Fixtures, Profil-/Pipelinetests, GUI-Smoke-Tests und
+- CSV-Beispieldateien, Profil-/Pipelinetests, GUI-Smoke-Tests und
   headless Prozesspruefung.
 - Getrennte deutsche/englische Anleitungen, Beispiele, CSV-/Report-/HTTP-/SFTP-Vertraege
   und dieses zweisprachige Changelog.
@@ -104,11 +104,11 @@ implied by this entry.
 
 - Vollständiger Offline-Build nach Beispiel- und Lizenzergänzung:
   138 Tests, 0 Fehlschläge, 0 Fehler, 2 übersprungen.
-- Synthetische fehlerhafte CSV: `INVALID`, fünf Befunde, Exit `1`; JSON-Report
+- Fehlerhafte CSV-Beispieldatei: `INVALID`, fünf Befunde, Exit `1`; JSON-Report
   nur im lokalen ignorierten Ordner `reports/` gespeichert.
 - Headless CLI-Exitcodes `0`/`1`/`2`, Reportausgabe, GUI-Konfiguration,
   LED-Wechsel und Start/Ende der paketierten GUI.
-- Kein produktiver SFTP-Zugriff. Kundendaten und Reports bleiben lokal.
+- Kein produktiver SFTP-Zugriff im lokalen Beispielpfad.
 
 ## Earlier development / Bisherige Entwicklung
 

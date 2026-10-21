@@ -3,10 +3,10 @@
 [English](README.md) | [Deutsch](README.de.md) | [Main guide](../../README.md)
 
 All commands below use Windows PowerShell from the repository root after
-`.\mvnw.cmd -B package`. Keep customer CSVs and generated reports in the local
-ignored directories; do not commit or upload them.
+`.\mvnw.cmd -B package`. Keep local CSV files and generated reports in the
+Git-ignored directories; do not commit or upload them.
 
-## Synthetic CSV example
+## CSV example from the test lab
 
 [Fictional bicycle rentals](fictional-bicycle-rentals.csv) and the matching
 [CSV validation profile](fictional-bicycle-rentals.csv-profile.json) are
@@ -67,7 +67,7 @@ Use `--profile` for a JSON Schema when the input is JSON. In the GUI, select
 both files and click **Validate now**. **Configure CSV rules** can create an
 editable CSV profile, and **Save result** exports the findings.
 
-## Synthetic JSON example
+## JSON example from the test lab
 
 [delivery.schema.json](delivery.schema.json) is a small local schema. A
 self-contained validation run uses the checked-in test fixtures:

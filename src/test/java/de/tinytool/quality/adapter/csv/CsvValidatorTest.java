@@ -41,7 +41,7 @@ class CsvValidatorTest {
     void reportsATypeFindingWithStableRowAndColumnPaths() throws Exception {
         ValidationResult result = validator.validate(
                 fixture("invalid-wrong-type.csv"),
-                fixture("delivery.csv-profile.json"));
+                fixture("delivery.csv-profile.json"), "valid-delivery.csv");
 
         assertThat(result.findings()).containsExactly(new Finding(
                 "/rows/0/quantity",
@@ -54,7 +54,7 @@ class CsvValidatorTest {
     void reportsMissingRequiredValues() throws Exception {
         ValidationResult result = validator.validate(
                 fixture("invalid-missing-required.csv"),
-                fixture("delivery.csv-profile.json"));
+                fixture("delivery.csv-profile.json"), "valid-delivery.csv");
 
         assertThat(result.findings()).containsExactly(new Finding(
                 "/rows/0/quantity",
@@ -64,10 +64,26 @@ class CsvValidatorTest {
     }
 
     @Test
+    void includesInterpolatedValuesInEnglishFilenameFindings(@TempDir Path directory) throws Exception {
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":",","encoding":"UTF-8",
+                 "fileNamePattern":"^expected\\\\.csv$","header":["code"],
+                 "columns":[{"name":"code","type":"string"}]}
+                """);
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\nvalue\n");
+
+        ValidationResult result = validator.validate(input, profile, "wrong.csv",
+                de.tinytool.quality.core.ValidationLanguage.EN);
+
+        assertThat(result.findings()).singleElement().extracting(Finding::message)
+                .isEqualTo("File name 'wrong.csv' does not match pattern '^expected\\.csv$'");
+    }
+
+    @Test
     void reportsHeaderMismatchesAsDataFindings() throws Exception {
         ValidationResult result = validator.validate(
                 fixture("invalid-header.csv"),
-                fixture("delivery.csv-profile.json"));
+                fixture("delivery.csv-profile.json"), "valid-delivery.csv");
 
         assertThat(result.findings()).containsExactly(new Finding(
                 "",
@@ -81,7 +97,7 @@ class CsvValidatorTest {
     void reportsAnUnexpectedColumnCount() throws Exception {
         ValidationResult result = validator.validate(
                 fixture("invalid-column-count.csv"),
-                fixture("delivery.csv-profile.json"));
+                fixture("delivery.csv-profile.json"), "valid-delivery.csv");
 
         assertThat(result.findings()).containsExactly(new Finding(
                 "/rows/0",
@@ -94,7 +110,7 @@ class CsvValidatorTest {
     void treatsMalformedCsvAsAnOperationalError() {
         assertThatThrownBy(() -> validator.validate(
                 fixture("malformed.csv"),
-                fixture("delivery.csv-profile.json")))
+                fixture("delivery.csv-profile.json"), "valid-delivery.csv"))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("Could not read CSV input");
     }
@@ -235,7 +251,7 @@ class CsvValidatorTest {
         Path input = Files.writeString(directory.resolve("input.csv"), "a;b\nab;c\na;bc\nab;c\n");
         var findings = validator.validate(input, profile).findings();
         assertThat(findings).singleElement().isEqualTo(new Finding("/rows/2", "/uniqueBy", "uniqueBy",
-                "Zeile 4: Schluessel aus a, b bereits in Zeile 2 vorhanden"));
+                "Zeile 4: Schlüssel aus a, b bereits in Zeile 2 vorhanden"));
     }
 
     @Test

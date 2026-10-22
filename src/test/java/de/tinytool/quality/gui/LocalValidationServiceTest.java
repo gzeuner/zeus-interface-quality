@@ -40,6 +40,26 @@ class LocalValidationServiceTest {
         assertThat(service.validate(fixture(input), fixture(profile)).isValid()).isTrue();
     }
 
+    @Test
+    void appliesConfiguredCsvCorrectionInTheLocalGuiValidationService(@TempDir Path directory) throws Exception {
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":",","encoding":"UTF-8",
+                 "header":["code"],"columns":[{"name":"code","type":"integer","required":true}],
+                 "correction":{"enabled":true}}
+                """);
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\nnot-an-integer\n1\n");
+
+        assertThat(service.correctionEnabled(profile)).isTrue();
+        ValidationResult result = service.validate(input, profile);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.metadata()).containsKey("correction");
+        assertThat(Files.readString(input)).isEqualTo("code\r\n1\r\n");
+        assertThat(Files.exists(directory.resolve("input.csv.original.bak"))).isTrue();
+        assertThat(Files.exists(directory.resolve("input.csv.rejected.csv"))).isTrue();
+        assertThat(Files.exists(directory.resolve("input.csv.correction.json"))).isTrue();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"http", "sftp"})
     void rejectsNetworkProfilesBeforeAnyTransportIsCreated(String format, @TempDir Path directory) throws Exception {

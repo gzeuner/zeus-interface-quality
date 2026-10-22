@@ -218,7 +218,8 @@ successful correction, the original is retained as `<file>.original.bak`,
 removed records (including the header) go to `<file>.rejected.csv`, and
 `<file>.correction.json` records row references and findings. Existing
 artifacts are never replaced. See the [CSV profile contract](docs/contracts/csv-profile-v1.md)
-for limits and details.
+for limits and details; the [correction regression coverage](docs/iterations/iteration-10-csv-correction-verification.md)
+describes the automated checks.
 
 [![Configure CSV rules in the desktop GUI](docs/images/gui-csv-rules-en.png)](docs/images/gui-csv-rules-en.png)
 

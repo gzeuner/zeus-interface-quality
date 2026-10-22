@@ -226,7 +226,8 @@ Prüfung besteht. Nach erfolgreicher Korrektur bleibt das Original als
 `<datei>.original.bak` erhalten; entfernte Datensätze samt Kopfzeile stehen in
 `<datei>.rejected.csv`, und `<datei>.correction.json` protokolliert Zeilen und
 Befunde. Vorhandene Belege werden nicht ersetzt. Details und Grenzen stehen im
-[CSV-Profilvertrag](docs/contracts/csv-profile-v1.de.md).
+[CSV-Profilvertrag](docs/contracts/csv-profile-v1.de.md); Regressionstests sind
+in der [Iteration 10](docs/iterations/iteration-10-csv-correction-verification.md) beschrieben.
 
 [![CSV-Regeln konfigurieren in der Desktop-GUI](docs/images/gui-csv-rules-de.png)](docs/images/gui-csv-rules-de.png)
 

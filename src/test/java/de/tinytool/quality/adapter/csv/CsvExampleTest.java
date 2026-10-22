@@ -33,7 +33,7 @@ class CsvExampleTest {
     @Test
     void exampleProfileDetectsDuplicateRentalId(@TempDir Path directory) throws Exception {
         String duplicate = Files.readString(CSV).replace("BIKE-005", "BIKE-001");
-        Path input = Files.writeString(directory.resolve("duplicate.csv"), duplicate);
+        Path input = Files.writeString(directory.resolve("fictional-bicycle-rentals.csv"), duplicate);
 
         var result = new CsvValidator().validate(input, PROFILE);
 

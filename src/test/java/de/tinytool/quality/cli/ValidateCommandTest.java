@@ -95,6 +95,31 @@ class ValidateCommandTest {
     }
 
     @Test
+    void correctsCsvWhenEnabledInProfileAndReportsTheSuccessfulResult(@TempDir Path directory) throws Exception {
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":",","encoding":"UTF-8",
+                 "header":["code"],"columns":[{"name":"code","type":"integer","required":true}],
+                 "correction":{"enabled":true}}
+                """);
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\n1\nnot-an-integer\n2\n");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+
+        int exitCode = commandLine(output, errors).execute(
+                "--input-format", "csv", "--schema", profile.toString(), "--input", input.toString(),
+                "--report", "json", "--language", "en");
+
+        var report = new ObjectMapper().readTree(output.toString());
+        assertThat(exitCode).withFailMessage(errors::toString).isZero();
+        assertThat(report.path("status").asText()).isEqualTo("VALID");
+        assertThat(report.path("metadata").path("correction").path("removedRecords").asInt()).isEqualTo(1);
+        assertThat(Files.readString(input)).isEqualTo("code\r\n1\r\n2\r\n");
+        assertThat(Files.exists(directory.resolve("input.csv.original.bak"))).isTrue();
+        assertThat(Files.exists(directory.resolve("input.csv.rejected.csv"))).isTrue();
+        assertThat(Files.exists(directory.resolve("input.csv.correction.json"))).isTrue();
+    }
+
+    @Test
     void autoDetectsCsvFromProfile() throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
@@ -161,7 +186,9 @@ class ValidateCommandTest {
     }
 
     @Test
-    void returnsTwoForMalformedCsvWithoutPrintingAReport() throws Exception {
+    void returnsTwoForMalformedCsvWithoutPrintingAReport(@TempDir Path directory) throws Exception {
+        Path malformedCsv = directory.resolve("valid-delivery.csv");
+        Files.copy(Path.of(fixture("csv/malformed.csv")), malformedCsv);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
         CommandLine commandLine = commandLine(output, errors);
@@ -169,7 +196,7 @@ class ValidateCommandTest {
         int exitCode = commandLine.execute(
                 "--input-format", "csv",
                 "--schema", fixture("csv/delivery.csv-profile.json").toString(),
-                "--input", fixture("csv/malformed.csv").toString(),
+                "--input", malformedCsv.toString(),
                 "--report", "json");
 
         assertThat(exitCode).isEqualTo(2);

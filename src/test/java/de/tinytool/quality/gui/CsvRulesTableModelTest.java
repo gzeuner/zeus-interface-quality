@@ -31,7 +31,7 @@ class CsvRulesTableModelTest {
         var document = model.toProfile();
         new CsvValidator().checkProfile(document);
         mapper.writeValue(profile.toFile(), document);
-        Path input = Files.writeString(directory.resolve("input.csv"),
+        Path input = Files.writeString(directory.resolve("fictional-bicycle-rentals.csv"),
                 Files.readString(exampleCsv()).replace(";city;", ";tandem;"));
 
         assertThat(new LocalValidationService().validate(input, profile).isValid()).isTrue();

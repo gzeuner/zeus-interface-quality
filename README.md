@@ -39,9 +39,11 @@ checked with the **same JSON profile**.
 |---|---|
 | [![Desktop GUI with a valid bicycle rental CSV](docs/images/gui-valid-en.png)](docs/images/gui-valid-en.png) | [![Desktop GUI with five findings from the invalid bicycle rental CSV](docs/images/gui-invalid-de.png)](docs/images/gui-invalid-de.png) |
 
-The screenshots were captured from the running Swing application by the GUI
-test. Click either image for full resolution. The validator's finding messages
-currently appear in German even when the GUI language is English.
+The valid and invalid views were captured from the running Swing application by
+the GUI test. The CSV editor views are 2× renders of the Swing dialog and show
+its profile settings. Click either image for full resolution. The GUI language
+controls findings for CSV, fixed-width and JSON Schema validation. The CLI
+accepts the same language choice with `--language`.
 
 ### Validation details
 
@@ -172,8 +174,8 @@ of a completed validation, never the rule file to select above.
 Use the **Language** selector in the header to switch between English and
 German without losing the current result. The TT banner opens
 [tiny-tool.de](https://tiny-tool.de/) in the system's default browser.
-Validation finding messages come from the selected validator and can still be
-in German.
+The selected GUI language controls CSV, fixed-width and JSON Schema findings
+on the next validation run.
 
 | LED | Meaning |
 |---|---|
@@ -204,9 +206,19 @@ are rejected, including disabled columns with invalid rules.
 
 The **Configure CSV rules** dialog makes the profile definition visible and
 editable: delimiter and decimal separator, encoding, BOF/EOF markers, row
-limits, uniqueness key, and the rules for each column. This makes it easy to
-adapt an existing CSV layout transparently before saving and using the profile
-for validation.
+limits, filename pattern, uniqueness key, and the rules for each column. The
+optional filename pattern checks the complete basename in both GUI and CLI.
+This makes it easy to adapt an existing CSV layout before saving and using the
+profile for validation.
+
+The optional **Correction** setting is off by default. When enabled, the GUI
+asks before changing the input file. It can remove invalid data records only
+when findings point to data rows and the staged CSV passes validation. After a
+successful correction, the original is retained as `<file>.original.bak`,
+removed records (including the header) go to `<file>.rejected.csv`, and
+`<file>.correction.json` records row references and findings. Existing
+artifacts are never replaced. See the [CSV profile contract](docs/contracts/csv-profile-v1.md)
+for limits and details.
 
 [![Configure CSV rules in the desktop GUI](docs/images/gui-csv-rules-en.png)](docs/images/gui-csv-rules-en.png)
 
@@ -254,6 +266,7 @@ java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile 
 | `--local-only` | Rejects HTTP/SFTP formats and profiles before transport access |
 | `--report text\|json` | stdout format; default TEXT |
 | `--report-file PATH` | Also writes the same report as UTF-8; parent directory must exist |
+| `--language de/en` | Finding language; defaults to German (`de`) |
 | `gui`, `--help`, `validate --help` | Desktop entry point / command help |
 
 Arguments are non-interactive: configuration/file errors never prompt for user
@@ -270,9 +283,17 @@ Report-file writes protect input/profile and replace other existing reports.
 Write errors return `2` without printing a successful validation report.
 On an operational failure an old report may remain: **always check the exit
 code**, not just the existence of a report file.
-The stable [report contract](docs/contracts/validation-report-v1.md) is unchanged.
-Finding messages are generally German; automation should use status, paths
-and rule keywords, not localized wording.
+The stable [report contract](docs/contracts/validation-report-v1.md) keeps the
+same finding shape. CSV correction adds optional summary metadata after a
+successful correction. Use `--language de` or `--language en` to select
+supported finding languages; automation should use status, paths and rule
+keywords rather than localized wording. SFTP/HTTP transport-level findings
+retain their adapter messages.
+
+For CSV profiles, `correction.enabled` controls row removal in the CLI and is
+disabled by default. The CLI does not prompt; enable it only in a profile
+intended to modify its input file. The original backup and audit artifacts are
+described in the [CSV profile contract](docs/contracts/csv-profile-v1.md).
 
 Example local PowerShell pipeline script, stopping on the first nonzero result:
 

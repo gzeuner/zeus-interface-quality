@@ -40,9 +40,12 @@ mit **derselben JSON-Regeldatei**.
 |---|---|
 | [![Desktop-GUI mit gültiger Fahrradverleih-CSV](docs/images/gui-valid-de.png)](docs/images/gui-valid-de.png) | [![Desktop-GUI mit fünf Befunden aus der fehlerhaften Fahrradverleih-CSV](docs/images/gui-invalid-de.png)](docs/images/gui-invalid-de.png) |
 
-Die Screenshots stammen aus der laufenden Swing-Anwendung und wurden im GUI-Test
-erstellt. Ein Klick öffnet die volle Auflösung. Die fachlichen Befundmeldungen
-sind derzeit auch bei englischer GUI auf Deutsch.
+Die Ansichten für gültige und fehlerhafte Daten wurden im GUI-Test aus der
+laufenden Swing-Anwendung aufgenommen. Die CSV-Regelansichten sind 2×-
+Renderings des Swing-Dialogs und zeigen seine Profileinstellungen.
+Ein Klick öffnet die volle Auflösung. Die GUI-Sprache steuert Befunde der
+CSV-, Fixed-Width- und JSON-Schema-Prüfungen. Die CLI bietet dieselbe
+Sprachauswahl über `--language`.
 
 ### Prüfdetails
 
@@ -175,10 +178,9 @@ Regeln für eine JSON-Datendatei. Ein unter `reports/` gespeichertes JSON ist
 das **Ergebnis** einer Prüfung und keine oben auszuwählende Regeldatei.
 
 Über **Sprache** im Kopfbereich lässt sich zwischen Deutsch und Englisch
-wechseln, ohne das aktuelle Prüfergebnis zu verlieren. Das TT-Banner öffnet
-[tiny-tool.de](https://tiny-tool.de/) im Standardbrowser. Fachliche
-Befundmeldungen stammen aus dem jeweiligen Validator und können weiterhin
-deutsch sein.
+wechseln, ohne das aktuelle Prüfergebnis zu verlieren. Bei der nächsten
+Prüfung steuert die Auswahl die Meldungen für CSV, Fixed-Width und JSON Schema.
+Das TT-Banner öffnet [tiny-tool.de](https://tiny-tool.de/) im Standardbrowser.
 
 | LED | Bedeutung |
 |---|---|
@@ -212,9 +214,19 @@ Fehlerhafte Konfigurationen werden auch bei deaktivierten Spalten abgelehnt.
 
 Der Dialog **CSV-Regeln konfigurieren** macht die Profildefinition sichtbar und
 bearbeitbar: Trenn- und Dezimalzeichen, Zeichensatz, BOF-/EOF-Marker,
-Datensatzgrenzen, Eindeutigkeitsschlüssel und die Regeln je Spalte. So lässt
-sich ein vorhandenes CSV-Layout nachvollziehbar anpassen, bevor das Profil
-gespeichert und für die Prüfung verwendet wird.
+Datensatzgrenzen, Dateinamenmuster, Eindeutigkeitsschlüssel und Regeln je
+Spalte. Das optionale Dateinamenmuster prüft den vollständigen Basisnamen in
+GUI und CLI. So lässt sich ein CSV-Layout nachvollziehbar anpassen, bevor das
+Profil gespeichert und für die Prüfung verwendet wird.
+
+Die optionale **Korrektur** ist standardmäßig ausgeschaltet. Ist sie aktiv,
+fragt die GUI vor einer Änderung der Eingabedatei nach. Entfernt werden können
+Datensätze mit zeilenbezogenen Befunden, sofern die vorbereitete CSV danach die
+Prüfung besteht. Nach erfolgreicher Korrektur bleibt das Original als
+`<datei>.original.bak` erhalten; entfernte Datensätze samt Kopfzeile stehen in
+`<datei>.rejected.csv`, und `<datei>.correction.json` protokolliert Zeilen und
+Befunde. Vorhandene Belege werden nicht ersetzt. Details und Grenzen stehen im
+[CSV-Profilvertrag](docs/contracts/csv-profile-v1.de.md).
 
 [![CSV-Regeln konfigurieren in der Desktop-GUI](docs/images/gui-csv-rules-de.png)](docs/images/gui-csv-rules-de.png)
 
@@ -263,6 +275,7 @@ java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile 
 | `--local-only` | Sperrt HTTP-/SFTP-Formate und -Profile vor Transportzugriff |
 | `--report text\|json` | stdout-Format; Default TEXT |
 | `--report-file PATH` | Zusätzlich derselbe Report als UTF-8; Zielverzeichnis muss existieren |
+| `--language de/en` | Sprache der Befunde; Standard ist Deutsch (`de`) |
 | `gui`, `--help`, `validate --help` | Desktop-Einstieg / Befehlshilfe |
 
 Die Argumentverarbeitung ist nicht-interaktiv; Fehler führen nicht zu Rückfragen.
@@ -278,9 +291,18 @@ darf weder Eingabe noch Profil ersetzen; andere vorhandene Reports werden
 ersetzt. Schreibfehler liefern `2`, ohne einen erfolgreichen Prüfreport auf
 stdout auszugeben. Bei einem Betriebsfehler kann eine alte Reportdatei
 erhalten bleiben: **immer den Exitcode auswerten**, nicht nur die Dateiexistenz.
-Der stabile [Reportvertrag](docs/contracts/validation-report-v1.de.md) bleibt
-unverändert. Befundmeldungen sind überwiegend Deutsch; für Automatisierung
-Status, Pfade und Regelkennungen statt des Meldungstexts verwenden.
+Der stabile [Reportvertrag](docs/contracts/validation-report-v1.de.md) behält
+dieselbe Befundstruktur. Eine erfolgreiche CSV-Korrektur ergänzt optionale
+Zusammenfassungsmetadaten. Mit `--language de` oder `--language en` lässt sich
+die unterstützte Befundsprache wählen. Für Automatisierung Status, Pfade und
+Regelkennungen statt des lokalisierten Meldungstexts verwenden.
+
+Bei CSV-Profilen steuert `correction.enabled`, ob die CLI fehlerhafte
+Datensätze entfernt. Standard ist `false`; die CLI fragt nicht nach einer
+Bestätigung. Nur in Profilen aktivieren, die ihre Eingabedatei ändern dürfen.
+Belege und Grenzen sind im [CSV-Profilvertrag](docs/contracts/csv-profile-v1.de.md)
+beschrieben. Transportbefunde für SFTP und HTTP behalten ihre jeweiligen
+Adaptermeldungen.
 
 Lokales PowerShell-Pipeline-Skript, Abbruch beim ersten Ergebnis ungleich null:
 

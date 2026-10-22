@@ -550,16 +550,32 @@ public final class DesktopFrame extends JFrame {
             showError(t("Auswahl unvollständig", "Incomplete selection"), e);
             return;
         }
+        try {
+            if (service.correctionEnabled(profilePath)
+                    && JOptionPane.showConfirmDialog(this,
+                    t("Korrektur aktiviert: fehlerhafte Datensätze können aus der Eingabedatei entfernt werden. "
+                                    + "Original-Backup, entfernte Zeilen und Prüfprotokoll werden angelegt. Fortfahren?",
+                            "Correction is enabled: invalid records may be removed from the input file. "
+                                    + "An original backup, rejected rows and an audit report will be created. Continue?"),
+                    t("CSV-Datei korrigieren?", "Correct CSV file?"),
+                    JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
+                return;
+            }
+        } catch (Exception e) {
+            showError(t("Profil konnte nicht gelesen werden", "Could not read profile"), e);
+            return;
+        }
         invalidateResult();
         setBusy(true);
         setStatus(LedIcon.RUNNING, t("Prüfung läuft ...", "Validation running ..."));
-        summary.setText(t("Die Anwendung bleibt bedienbar. Die Eingabedatei wird nicht verändert.",
-                "The app stays responsive. The input file is not changed."));
+        summary.setText(t("Die Anwendung bleibt bedienbar. Eine konfigurierte Korrektur wird protokolliert.",
+                "The app stays responsive. Any configured correction is recorded."));
+        UiLanguage selectedLanguage = language;
         long start = System.nanoTime();
         new SwingWorker<ValidationResult, Void>() {
             @Override
             protected ValidationResult doInBackground() throws Exception {
-                return service.validate(inputPath, profilePath);
+                return service.validate(inputPath, profilePath, selectedLanguage.validationLanguage());
             }
 
             @Override

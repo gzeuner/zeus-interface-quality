@@ -17,6 +17,8 @@ import de.tinytool.quality.core.Finding;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
+import de.tinytool.quality.core.ValidationLanguage;
+import de.tinytool.quality.core.ValidationMessages;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -45,6 +47,11 @@ public final class FixedWidthValidator implements Validator {
 
     @Override
     public ValidationResult validate(Path input, Path schema) throws ValidationException {
+        return validate(input, schema, ValidationLanguage.DE);
+    }
+
+    @Override
+    public ValidationResult validate(Path input, Path schema, ValidationLanguage language) throws ValidationException {
         Path inputFile = LocalFiles.requireRegularFile(input, "Fixed-width input");
         Path profileFile = LocalFiles.requireRegularFile(schema, "Fixed-width profile");
         FixedWidthProfile profile = FixedWidthProfile.read(profileFile, objectMapper);
@@ -56,14 +63,14 @@ public final class FixedWidthValidator implements Validator {
             long recordNumber = 0;
             while ((line = reader.readLine()) != null) {
                 recordNumber++;
-                validateRecord(line, recordNumber, profile, findings);
+                validateRecord(line, recordNumber, profile, findings, language);
             }
             if (recordNumber == 0) {
                 findings.add(new Finding(
                         "",
                         "/records",
                         "minRecords",
-                        "Datei enthält keine Datensätze"));
+                        ValidationMessages.text(language, "emptyRecords")));
             }
         } catch (IOException | RuntimeException e) {
             throw new ValidationException(
@@ -87,7 +94,8 @@ public final class FixedWidthValidator implements Validator {
             String line,
             long recordNumber,
             FixedWidthProfile profile,
-            List<Finding> findings
+            List<Finding> findings,
+            ValidationLanguage language
     ) {
         int rowIndex = Math.toIntExact(recordNumber - 1);
         if (line.length() != profile.recordLength()) {
@@ -95,8 +103,9 @@ public final class FixedWidthValidator implements Validator {
                     "/records/" + rowIndex,
                     "/recordLength",
                     "recordLength",
-                    "Zeile " + recordNumber + ": " + line.length()
-                            + " Zeichen gefunden, " + profile.recordLength() + " erwartet"));
+                    language == ValidationLanguage.DE
+                            ? "Zeile " + recordNumber + ": " + line.length() + " Zeichen gefunden, " + profile.recordLength() + " erwartet"
+                            : "Row " + recordNumber + ": found " + line.length() + " characters; expected " + profile.recordLength()));
             return;
         }
 
@@ -116,6 +125,8 @@ public final class FixedWidthValidator implements Validator {
                     column.rules(),
                     path,
                     schemaPath,
+                    '.',
+                    language,
                     findings);
         }
     }

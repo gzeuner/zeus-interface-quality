@@ -10,12 +10,14 @@ package de.tinytool.quality.cli;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tinytool.quality.adapter.csv.CsvValidator;
+import de.tinytool.quality.adapter.csv.CsvCorrectionService;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
 import de.tinytool.quality.adapter.support.LocalFiles;
 import de.tinytool.quality.adapter.support.LocalOutputs;
 import de.tinytool.quality.adapter.support.ProfileDocuments;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
+import de.tinytool.quality.core.ValidationLanguage;
 import de.tinytool.quality.core.Validator;
 import de.tinytool.quality.report.JsonReportWriter;
 import de.tinytool.quality.report.ReportFormat;
@@ -82,6 +84,10 @@ public final class ValidateCommand implements Callable<Integer> {
     )
     private InputFormat inputFormat;
 
+    @Option(names = "--language", defaultValue = "de", paramLabel = "LANGUAGE",
+            description = "Finding language: de or en (default: de).")
+    private String language = "de";
+
     @Spec
     private CommandSpec spec;
 
@@ -126,7 +132,12 @@ public final class ValidateCommand implements Callable<Integer> {
             if (localOnly) {
                 requireLocalProfile();
             }
-            ValidationResult result = validators.validatorFor(inputFormat, schema).validate(input, schema);
+            Validator validator = validators.validatorFor(inputFormat, schema);
+            ValidationLanguage selectedLanguage = ValidationLanguage.from(language);
+            ValidationResult result = validator.validate(input, schema, selectedLanguage);
+            if (validator instanceof CsvValidator) {
+                result = new CsvCorrectionService().correct(input, schema, selectedLanguage, result);
+            }
             String report = reportFormat == ReportFormat.JSON
                     ? jsonReportWriter.write(result) + System.lineSeparator()
                     : textReportWriter.write(result);

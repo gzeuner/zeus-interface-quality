@@ -3,6 +3,7 @@
   "version": 1,
   "delimiter": ";",
   "encoding": "UTF-8",
+  "fileNamePattern": "^valid-delivery\\.csv$",
   "header": [
     "deliveryId",
     "quantity",

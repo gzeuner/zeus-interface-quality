@@ -20,6 +20,8 @@ is required. Existing version-1 profiles retain their behavior.
   "minRecords": 1,
   "maxRecords": 100000,
   "uniqueBy": ["receipt", "line"],
+  "fileNamePattern": "^orders-[0-9]{8}\\.csv$",
+  "correction": { "enabled": false },
   "columns": [
     {"name": "receipt", "enabled": true, "type": "integer", "required": true},
     {"name": "line", "enabled": true, "type": "integer", "required": true},
@@ -43,6 +45,8 @@ is required. Existing version-1 profiles retain their behavior.
 | `envelope` | Optional object with distinct non-empty `begin` and `end` marker strings. Begin record precedes the header; end record is the last CSV record. Each marker record must have the full column count and empty remaining fields. |
 | `minRecords`, `maxRecords` | Optional non-negative integers, inclusive. `minRecords` must not exceed `maxRecords`. Count data records only, excluding header and envelope. A wrong-width data record still counts. These are validation rules, not resource limits or truncation settings. |
 | `uniqueBy` | Optional non-empty array of distinct existing column names, forming one composite key. Omit to disable. |
+| `fileNamePattern` | Optional Java regular expression matched against the complete input file basename, case-sensitively. Omit to disable. An invalid expression is a profile error. |
+| `correction` | Optional object `{ "enabled": boolean }`, default `false`. When enabled, local CSV validation may remove invalid data records. The GUI asks before changing the file; CLI follows the profile without prompting. The original bytes are backed up as `.original.bak`, removed rows plus the header go to `.rejected.csv`, and `.correction.json` records row numbers and findings. Existing artifacts are never overwritten. Only row-scoped findings are eligible; the staged result must pass validation before replacement. Rewriting preserves decoded field values, charset and delimiter; quoting and line endings may be normalized. |
 | `$id`, `$schema` | Optional metadata; not retrieved from the network by the CSV adapter. |
 
 Header-only files, or begin/header/end files without data, remain valid by default.
@@ -87,13 +91,18 @@ and conflicting bounds are configuration errors, not ignored options.
 The [v1 report contract](validation-report-v1.md) remains unchanged.
 Additional finding keywords are `minRecords`, `maxRecords`, and `uniqueBy`;
 file-level paths are `/minRecords`, `/maxRecords`, and `/uniqueBy`.
+`fileNamePattern` findings use the empty instance path, `/fileNamePattern`, and
+keyword `fileNamePattern`; the report contract does not include local file
+paths. The same CSV profile checks a local file's basename in the GUI and CLI;
+the SFTP validator checks the original remote basename, not its temporary
+download name.
 Column findings continue to use `/rows/<zero-based-data-row>/<column-name>`.
 Malformed CSV syntax and invalid profiles return operational error exit `2`;
 valid input returns `0`, rule violations return `1`.
 
 The GUI profile export refuses to overwrite existing files. Edit the JSON with
 any editor or select it in the GUI and click **CSV-Regeln konfigurieren**.
-The GUI allows editing the file format, markers, row limits, composite key,
+The GUI allows editing the file format, markers, row limits, filename pattern, composite key,
 column names/definitions (with add/remove), types, enable/required flags, lengths,
 bounds and regex. It validates the configuration before saving and switching
 to that profile. Save confirmation is required before replacing an existing

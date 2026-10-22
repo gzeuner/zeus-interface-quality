@@ -48,6 +48,20 @@ entries in `findings`. In the GUI, select the invalid CSV as the data file,
 leave the JSON rules selected, and click **Validate now**. Selecting a finding
 shows its exact data path, rule path and message.
 
+The profile checks the filename before parsing the CSV. To verify a mismatch,
+copy the valid sample under a name that does not match and run the CLI:
+
+```powershell
+New-Item -ItemType Directory -Force .\data | Out-Null
+Copy-Item .\docs\examples\fictional-bicycle-rentals.csv .\data\unexpected.csv
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\fictional-bicycle-rentals.csv-profile.json --input .\data\unexpected.csv --local-only --report json
+```
+
+The report uses `keyword: fileNamePattern` and `schemaPath:
+/fileNamePattern`; the CLI exits with `1`. In the GUI, select the same file
+while keeping the sample profile. Edit the optional pattern in **Configure
+CSV rules**.
+
 At startup, the GUI selects the valid sample CSV and its matching rules. The CSV contains the records;
 `fictional-bicycle-rentals.csv-profile.json` supplies the validation rules.
 `delivery.schema.json` is a separate JSON Schema for JSON input, while a JSON

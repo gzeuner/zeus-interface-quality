@@ -7,9 +7,22 @@ anwenderrelevante Änderungen.
 
 ## Unreleased / Unveröffentlicht
 
-Documentation and verification status: **2026-10-20**.
-Current Maven version: **0.1.0-SNAPSHOT**. No release, tag, commit or push is
-implied by this entry.
+### Bilingual findings and traceable CSV correction
+
+- Added a central DE/EN validation message catalog with stable keys and the CLI
+  option `--language de|en`.
+- Added an optional CSV profile correction setting, disabled by default. When
+  enabled, row-scoped invalid records are removed only after the staged file
+  passes validation. The GUI asks before modifying the input; the CLI follows
+  the profile.
+- Successful correction keeps the original as `.original.bak`, writes removed
+  records to `.rejected.csv` and records findings and row references in
+  `.correction.json`. Existing artifacts are never overwritten.
+- Implementation notes: [Iteration 9](docs/iterations/iteration-9-bilingual-findings-and-csv-correction.md).
+
+Documentation and verification status: **2026-10-22**.
+Current Maven version: **0.1.0-SNAPSHOT**. This entry documents the working
+version and does not announce a release.
 
 ### English
 
@@ -30,6 +43,9 @@ implied by this entry.
 - Backward-compatible CSV options: `decimalSeparator`, `envelope`,
   `minRecords`, `maxRecords`, composite `uniqueBy` and per-column `enabled`.
   Shared scalar types now include `date` and `time`.
+- Optional CSV `fileNamePattern` for full, case-sensitive basename checks in
+  the GUI, local CLI and SFTP content validation; profiles without it retain
+  their prior behavior.
 - Visual CSV profile editor for portable configurations used unchanged by
   the GUI and CLI.
 - CLI `--report-file` and `--local-only` for repeatable local workflows.
@@ -54,6 +70,10 @@ implied by this entry.
 
 - Full offline build after the example and license update: 138 tests,
   0 failures, 0 errors, 2 skipped.
+- 2026-10-22 package build with tests skipped, after the filename-pattern
+  changes; GUI editor screenshots regenerated at 2× scale.
+- 2026-10-22 clean package build after bilingual findings and CSV correction;
+  Maven tests skipped for this iteration.
 - Invalid CSV sample: `INVALID`, five findings, exit `1`; JSON report saved
   only in the local ignored `reports/` directory.
 - Headless CLI exit codes `0`/`1`/`2`, report writing, GUI configuration and
@@ -61,6 +81,21 @@ implied by this entry.
 - No production SFTP access in the local example path.
 
 ### Deutsch
+
+#### Zweisprachige Befunde und nachvollziehbare CSV-Korrektur
+
+- Zentraler DE/EN-Meldungskatalog mit stabilen Schluesseln und CLI-Option
+  `--language de|en`.
+- Optionale CSV-Profiloption `correction.enabled`, standardmaessig aus.
+  Zeilenbezogene fehlerhafte Datensaetze werden erst entfernt, wenn die
+  temporaere Datei danach die Pruefung besteht. Die GUI fragt vor der Aenderung;
+  die CLI folgt der Profileinstellung.
+- Bei Erfolg bleibt das Original als `.original.bak`, verworfene Datensaetze
+  stehen in `.rejected.csv`, und `.correction.json` protokolliert Zeilen und
+  Befunde. Vorhandene Belege werden nicht ueberschrieben.
+- Details: [Iteration 9](docs/iterations/iteration-9-bilingual-findings-and-csv-correction.md).
+
+#### Hinzugefügt
 
 #### Hinzugefügt
 
@@ -80,6 +115,9 @@ implied by this entry.
 - Rueckwaertskompatible CSV-Optionen: `decimalSeparator`, `envelope`,
   `minRecords`, `maxRecords`, zusammengesetztes `uniqueBy` und `enabled`
   je Spalte. Gemeinsame skalare Typen um `date`/`time` erweitert.
+- Optionales CSV-`fileNamePattern` fuer vollstaendige, case-sensitive
+  Basisnamenpruefung in GUI, lokaler CLI und SFTP-Inhaltspruefung; Profile
+  ohne dieses Feld behalten ihr bisheriges Verhalten.
 - Visueller CSV-Regeleditor fuer unveraendert in GUI/CLI verwendbare Profile.
 - CLI `--report-file` und `--local-only` für wiederholbare lokale Abläufe.
 - CSV-Beispieldateien, Profil-/Pipelinetests, GUI-Smoke-Tests und
@@ -104,6 +142,8 @@ implied by this entry.
 
 - Vollständiger Offline-Build nach Beispiel- und Lizenzergänzung:
   138 Tests, 0 Fehlschläge, 0 Fehler, 2 übersprungen.
+- 2026-10-22 sauberer Paket-Build nach zweisprachigen Befunden und CSV-Korrektur;
+  Maven-Tests fuer diese Iteration uebersprungen.
 - Fehlerhafte CSV-Beispieldatei: `INVALID`, fünf Befunde, Exit `1`; JSON-Report
   nur im lokalen ignorierten Ordner `reports/` gespeichert.
 - Headless CLI-Exitcodes `0`/`1`/`2`, Reportausgabe, GUI-Konfiguration,

@@ -48,6 +48,20 @@ In der GUI die fehlerhafte CSV als Datendatei wählen, die JSON-Regeln beibehalt
 und **Jetzt prüfen** anklicken. Nach Auswahl eines Befunds erscheinen Datenpfad,
 Regelpfad und vollständige Meldung.
 
+Auch der Dateiname wird vor dem CSV-Inhalt geprüft. Zum Gegencheck eine Datei
+mit einem absichtlich unpassenden Namen kopieren und lokal validieren:
+
+```powershell
+New-Item -ItemType Directory -Force .\data | Out-Null
+Copy-Item .\docs\examples\fictional-bicycle-rentals.csv .\data\unexpected.csv
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\fictional-bicycle-rentals.csv-profile.json --input .\data\unexpected.csv --local-only --report json
+```
+
+Der Report meldet `keyword: fileNamePattern` und `schemaPath:
+/fileNamePattern`; der CLI-Exitcode ist `1`. In der GUI dieselbe Datei bei
+ausgewähltem Beispielprofil öffnen. Das optionale Muster lässt sich im Dialog
+**CSV-Regeln konfigurieren** bearbeiten.
+
 Beim Start wählt die GUI die gültige Beispiel-CSV und die passenden Regeln.
 Die CSV enthält die Datensätze;
 `fictional-bicycle-rentals.csv-profile.json` liefert die Prüfregeln.

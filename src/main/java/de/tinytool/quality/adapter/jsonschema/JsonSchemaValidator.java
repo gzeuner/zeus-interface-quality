@@ -25,6 +25,7 @@ import de.tinytool.quality.core.Finding;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
+import de.tinytool.quality.core.ValidationLanguage;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,12 +58,17 @@ public final class JsonSchemaValidator implements Validator {
 
     @Override
     public ValidationResult validate(Path input, Path schema) throws ValidationException {
+        return validate(input, schema, ValidationLanguage.DE);
+    }
+
+    @Override
+    public ValidationResult validate(Path input, Path schema, ValidationLanguage language) throws ValidationException {
         Path inputFile = requireRegularFile(input, "Input document");
         Path schemaFile = requireRegularFile(schema, "Schema");
 
         try {
             JsonNode inputNode = requireDocument(objectMapper.readTree(inputFile.toFile()));
-            return validateNode(inputNode, schemaFile);
+            return validateNode(inputNode, schemaFile, language);
         } catch (IOException e) {
             throw new ValidationException("Could not read JSON input or schema: " + e.getMessage(), e);
         } catch (RuntimeException e) {
@@ -78,6 +84,10 @@ public final class JsonSchemaValidator implements Validator {
      * local JSON adapter.</p>
      */
     public ValidationResult validateNode(JsonNode inputNode, Path schema) throws ValidationException {
+        return validateNode(inputNode, schema, ValidationLanguage.DE);
+    }
+
+    public ValidationResult validateNode(JsonNode inputNode, Path schema, ValidationLanguage language) throws ValidationException {
         if (inputNode == null) {
             throw new ValidationException("JSON input node is required");
         }
@@ -93,7 +103,7 @@ public final class JsonSchemaValidator implements Validator {
             try (InputStream stream = Files.newInputStream(schemaFile)) {
                 schemaNode = schemaReader.readTree(stream, InputFormat.JSON);
             }
-            Schema validatorSchema = createRegistry(schemaDirectory, schemaReader)
+            Schema validatorSchema = createRegistry(schemaDirectory, schemaReader, language)
                     .getSchema(SchemaLocation.of(schemaFile.toUri().toString()), schemaNode);
             validatorSchema.initializeValidators();
 
@@ -103,7 +113,7 @@ public final class JsonSchemaValidator implements Validator {
             }
 
             return ValidationResult.invalid(errors.stream()
-                    .map(JsonSchemaValidator::toFinding)
+                    .map(error -> toFinding(error, language))
                     .toList());
         } catch (IOException e) {
             throw new ValidationException("Could not read JSON schema: " + e.getMessage(), e);
@@ -128,7 +138,8 @@ public final class JsonSchemaValidator implements Validator {
         }
     }
 
-    private static SchemaRegistry createRegistry(Path schemaDirectory, NodeReader schemaReader) {
+    private static SchemaRegistry createRegistry(Path schemaDirectory, NodeReader schemaReader,
+                                                 ValidationLanguage language) {
         SchemaLoader schemaLoader = SchemaLoader.builder()
                 .fetchRemoteResources(false)
                 .resourceLoaders(loaders -> loaders.add(iri ->
@@ -139,7 +150,7 @@ public final class JsonSchemaValidator implements Validator {
         SchemaRegistryConfig registryConfig = SchemaRegistryConfig.builder()
                 .pathType(com.networknt.schema.path.PathType.JSON_POINTER)
                 .formatAssertionsEnabled(true)
-                .locale(Locale.GERMAN)
+                .locale(language.locale())
                 .build();
 
         return SchemaRegistry.withDefaultDialect(
@@ -224,7 +235,7 @@ public final class JsonSchemaValidator implements Validator {
         return fragmentStart >= 0 ? iri.substring(0, fragmentStart) : iri;
     }
 
-    private static Finding toFinding(Error error) {
+    private static Finding toFinding(Error error, ValidationLanguage language) {
         return new Finding(
                 pathOf(error.getInstanceLocation()),
                 pathOf(error.getEvaluationPath()),

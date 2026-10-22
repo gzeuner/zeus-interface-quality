@@ -11,6 +11,7 @@ package de.tinytool.quality.gui;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tinytool.quality.adapter.csv.CsvValidator;
+import de.tinytool.quality.adapter.csv.CsvCorrectionService;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
 import de.tinytool.quality.adapter.jsonschema.JsonSchemaValidator;
 import de.tinytool.quality.adapter.support.LocalFiles;
@@ -18,6 +19,7 @@ import de.tinytool.quality.adapter.support.LocalOutputs;
 import de.tinytool.quality.adapter.support.ProfileDocuments;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
+import de.tinytool.quality.core.ValidationLanguage;
 import de.tinytool.quality.core.Validator;
 import de.tinytool.quality.report.JsonReportWriter;
 import de.tinytool.quality.report.ReportFormat;
@@ -35,6 +37,10 @@ public final class LocalValidationService {
     private final ObjectMapper mapper = ProfileDocuments.strictMapper(new ObjectMapper());
 
     public ValidationResult validate(Path input, Path profile) throws ValidationException {
+        return validate(input, profile, ValidationLanguage.DE);
+    }
+
+    public ValidationResult validate(Path input, Path profile, ValidationLanguage language) throws ValidationException {
         Path profileFile = LocalFiles.requireRegularFile(profile, "Profil");
         JsonNode root = ProfileDocuments.readRoot(profileFile, mapper, "Profil");
         String format = root == null ? "" : root.path("format").asText("");
@@ -45,7 +51,23 @@ public final class LocalValidationService {
                     "Die GUI prueft nur lokale Dateien. HTTP- und SFTP-Profile sind hier gesperrt.");
             default -> new JsonSchemaValidator();
         };
-        return validator.validate(requireDataFile(input), profileFile);
+        Path data = requireDataFile(input);
+        ValidationResult result = validator instanceof CsvValidator csv
+                ? csv.validate(data, profileFile, data.getFileName().toString(), language)
+                : validator instanceof FixedWidthValidator fixed
+                    ? fixed.validate(data, profileFile, language)
+                    : validator instanceof JsonSchemaValidator json
+                        ? json.validate(data, profileFile, language)
+                        : validator.validate(data, profileFile);
+        return validator instanceof CsvValidator
+                ? new CsvCorrectionService().correct(data, profileFile, language, result)
+                : result;
+    }
+
+    public boolean correctionEnabled(Path profile) throws ValidationException {
+        JsonNode root = ProfileDocuments.readRoot(LocalFiles.requireRegularFile(profile, "Profil"), mapper, "Profil");
+        return "csv".equals(root.path("format").asText())
+                && root.path("correction").path("enabled").asBoolean(false);
     }
 
     private static Path requireDataFile(Path input) throws ValidationException {

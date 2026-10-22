@@ -20,6 +20,8 @@ Regelzustand notwendig. Bestehende Version-1-Profile behalten ihr Verhalten.
   "minRecords": 1,
   "maxRecords": 100000,
   "uniqueBy": ["receipt", "line"],
+  "fileNamePattern": "^orders-[0-9]{8}\\.csv$",
+  "correction": { "enabled": false },
   "columns": [
     {"name": "receipt", "enabled": true, "type": "integer", "required": true},
     {"name": "line", "enabled": true, "type": "integer", "required": true},
@@ -43,6 +45,8 @@ Regelzustand notwendig. Bestehende Version-1-Profile behalten ihr Verhalten.
 | `envelope` | Optionales Objekt mit verschiedenen nichtleeren Zeichenfolgen `begin` und `end`. Anfangssatz vor der Kopfzeile, Endsatz als letzter CSV-Satz. Beide benoetigen die vollstaendige Spaltenanzahl und sonst leere Felder. |
 | `minRecords`, `maxRecords` | Optionale nicht-negative Ganzzahlen, inklusive Grenzen; Minimum darf Maximum nicht uebersteigen. Nur Datensaetze zaehlen, keine Kopf-/Markersaetze. Falsche Spaltenanzahl zaehlt trotzdem als Datensatz. Keine Ressourcenlimits oder Abschneideoptionen. |
 | `uniqueBy` | Optionales nichtleeres Array verschiedener vorhandener Spaltennamen als gemeinsamer Schluessel. Zum Abschalten weglassen. |
+| `fileNamePattern` | Optionaler Java-regulaerer Ausdruck, der zum vollstaendigen Basisnamen der Eingabedatei passen muss; Gross-/Kleinschreibung wird beachtet. Zum Abschalten weglassen. Ein ungueltiger Ausdruck ist ein Profilfehler. |
+| `correction` | Optionales Objekt `{ "enabled": boolean }`, Default `false`. Bei Aktivierung darf die lokale CSV-Pruefung fehlerhafte Datensaetze entfernen. Die GUI fragt vor der Aenderung nach; die CLI folgt dem Profil ohne Rueckfrage. Die Originalbytes werden als `.original.bak` gesichert, entfernte Zeilen samt Kopfzeile kommen in `.rejected.csv`, und `.correction.json` protokolliert Zeilennummern und Befunde. Vorhandene Artefakte werden nie ueberschrieben. Nur Befunde auf Datensatzebene sind geeignet; die temporaere Datei muss die Pruefung bestehen, bevor sie das Original ersetzt. Feldwerte, Zeichensatz und Trennzeichen bleiben erhalten; Quotes und Zeilenenden koennen normalisiert werden. |
 | `$id`, `$schema` | Optionale Metadaten; der CSV-Adapter ruft sie nicht aus dem Netzwerk ab. |
 
 Eine Datei nur mit Kopfzeile bzw. mit Anfangsmarker/Kopfzeile/Endmarker bleibt
@@ -88,13 +92,18 @@ keine stillschweigend ignorierten Optionen.
 Der [Reportvertrag v1](validation-report-v1.de.md) bleibt unveraendert.
 Weitere Regelkennungen sind `minRecords`, `maxRecords` und `uniqueBy`;
 Profilpfade dafuer sind `/minRecords`, `/maxRecords` und `/uniqueBy`.
+`fileNamePattern` verwendet den leeren Datenpfad, den Profilpfad
+`/fileNamePattern` und die Regelkennung `fileNamePattern`. Der Report enthaelt
+keine lokalen Dateipfade. GUI und CLI pruefen denselben lokalen Basisnamen;
+bei SFTP gilt der urspruengliche entfernte Basisname, nicht der temporaere
+Downloadname.
 Spaltenbefunde verwenden `/rows/<nullbasierter-datensatz>/<spaltenname>`.
 Fehlerhafte CSV-Syntax/Profile liefern Exit `2`, gueltige Eingaben `0`,
 Regelverletzungen `1`.
 
 Der Profilexport aus der GUI ueberschreibt keine vorhandene Datei. JSON beliebig bearbeiten oder
 das Profil in der GUI auswaehlen und **CSV-Regeln konfigurieren** oeffnen.
-Der Editor unterstuetzt Format, Marker, Anzahlgrenzen, Fachschluessel,
+Der Editor unterstuetzt Format, Marker, Anzahlgrenzen, Dateinamenmuster und Fachschluessel,
 Spaltennamen/-definitionen, Typen, Aktiv-/Pflichtschalter, Laengen, Grenzen
 und Regex. Die Konfiguration wird vor dem Speichern geprueft.
 Vorhandene Profile werden nur nach Bestaetigung ersetzt; die Dateneingabe

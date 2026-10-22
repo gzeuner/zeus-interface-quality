@@ -17,6 +17,7 @@ import de.tinytool.quality.core.Finding;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
+import de.tinytool.quality.core.ValidationLanguage;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -85,6 +86,11 @@ public final class SftpValidator implements Validator {
 
     @Override
     public ValidationResult validate(Path input, Path schema) throws ValidationException {
+        return validate(input, schema, ValidationLanguage.DE);
+    }
+
+    @Override
+    public ValidationResult validate(Path input, Path schema, ValidationLanguage language) throws ValidationException {
         if (input != null) {
             throw new ValidationException(
                     "SFTP validation does not accept --input; the remote location is in the profile");
@@ -96,7 +102,7 @@ public final class SftpValidator implements Validator {
 
         Path temporaryDirectory = createTemporaryDirectory();
         try {
-            return downloadAndValidate(profile, contentValidator, temporaryDirectory);
+            return downloadAndValidate(profile, contentValidator, temporaryDirectory, language);
         } finally {
             deleteTemporaryDirectory(temporaryDirectory);
         }
@@ -105,7 +111,8 @@ public final class SftpValidator implements Validator {
     private ValidationResult downloadAndValidate(
             SftpProfile profile,
             Validator contentValidator,
-            Path temporaryDirectory
+            Path temporaryDirectory,
+            ValidationLanguage language
     ) throws ValidationException {
         SftpTransferException lastTransferFailure = null;
         for (int attempt = 1; attempt <= profile.maxAttempts(); attempt++) {
@@ -155,8 +162,10 @@ public final class SftpValidator implements Validator {
                         }
                     }
 
-                    ValidationResult contentResult = contentValidator.validate(
-                            temporaryFile, profile.contentProfile());
+                    ValidationResult contentResult = contentValidator instanceof CsvValidator csvValidator
+                            ? csvValidator.validate(temporaryFile, profile.contentProfile(),
+                                    fileName(selectedFile.remotePath()), language)
+                            : contentValidator.validate(temporaryFile, profile.contentProfile(), language);
                     if (!contentResult.isValid()) {
                         findings.addAll(prefixContentFindings(
                                 contentResult, selectedFile, profile.version() == 1));

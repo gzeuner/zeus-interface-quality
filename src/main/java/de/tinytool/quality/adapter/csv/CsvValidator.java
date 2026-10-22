@@ -18,6 +18,8 @@ import de.tinytool.quality.core.Finding;
 import de.tinytool.quality.core.ValidationException;
 import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
+import de.tinytool.quality.core.ValidationLanguage;
+import de.tinytool.quality.core.ValidationMessages;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -59,8 +61,28 @@ public final class CsvValidator implements Validator {
     @Override
     public ValidationResult validate(Path input, Path schema) throws ValidationException {
         Path inputFile = LocalFiles.requireRegularFile(input, "CSV input");
+        return validate(inputFile, schema, inputFile.getFileName().toString(), ValidationLanguage.DE);
+    }
+
+    /** Validates a downloaded CSV against its logical source file name. */
+    public ValidationResult validate(Path input, Path schema, String logicalFileName) throws ValidationException {
+        return validate(input, schema, logicalFileName, ValidationLanguage.DE);
+    }
+
+    public ValidationResult validate(Path input, Path schema, String logicalFileName, ValidationLanguage language) throws ValidationException {
+        Path inputFile = LocalFiles.requireRegularFile(input, "CSV input");
         Path profileFile = LocalFiles.requireRegularFile(schema, "CSV profile");
         CsvProfile profile = CsvProfile.read(profileFile, objectMapper);
+
+        if (logicalFileName == null || logicalFileName.isBlank()) {
+            throw new ValidationException("CSV logical file name must not be empty");
+        }
+        if (profile.fileNamePattern() != null && !profile.fileNamePattern().matcher(logicalFileName).matches()) {
+            return ValidationResult.invalid(List.of(new Finding(
+                    "", "/fileNamePattern", "fileNamePattern",
+                    ValidationMessages.text(language, "filename", logicalFileName,
+                            profile.fileNamePattern().pattern()))));
+        }
 
         List<Finding> findings = new ArrayList<>();
         CSVFormat format = CSVFormat.DEFAULT.builder()
@@ -74,7 +96,7 @@ public final class CsvValidator implements Validator {
             var records = parser.iterator();
             if (!records.hasNext()) {
                 return ValidationResult.invalid(List.of(new Finding(
-                        "", "/header", "header", "CSV-Datei enthält keine Kopfzeile")));
+                        "", "/header", "header", ValidationMessages.text(language, "headerMissing"))));
             }
 
             if (profile.envelope() != null) {
@@ -89,18 +111,18 @@ public final class CsvValidator implements Validator {
                 }
                 if (!records.hasNext()) {
                     return ValidationResult.invalid(List.of(new Finding(
-                            "", "/header", "header", "CSV-Datei enthält keine Kopfzeile")));
+                            "", "/header", "header", ValidationMessages.text(language, "headerMissing"))));
                 }
             }
 
             CSVRecord header = records.next();
-            String headerProblem = compareHeader(header, profile.header(), profile.delimiter());
+            String headerProblem = compareHeader(header, profile.header(), profile.delimiter(), language);
             if (headerProblem != null) {
                 return ValidationResult.invalid(List.of(new Finding(
                         "", "/header", "header", headerProblem)));
             }
 
-            validateRows(records, profile, header.getRecordNumber(), findings);
+            validateRows(records, profile, header.getRecordNumber(), findings, language);
         } catch (IOException | RuntimeException e) {
             throw new ValidationException("Could not read CSV input: " + LocalFiles.safeMessage(e), e);
         }
@@ -110,13 +132,20 @@ public final class CsvValidator implements Validator {
                 : ValidationResult.invalid(findings);
     }
 
+    @Override
+    public ValidationResult validate(Path input, Path schema, ValidationLanguage language) throws ValidationException {
+        Path inputFile = LocalFiles.requireRegularFile(input, "CSV input");
+        return validate(inputFile, schema, inputFile.getFileName().toString(), language);
+    }
+
     private static void validateRows(
             java.util.Iterator<CSVRecord> records,
             CsvProfile profile,
             long headerRecordNumber,
-            List<Finding> findings
+            List<Finding> findings,
+            ValidationLanguage language
     ) {
-        RowChecks checks = new RowChecks(profile, findings);
+        RowChecks checks = new RowChecks(profile, findings, language);
         if (profile.envelope() == null) {
             while (records.hasNext()) {
                 checks.accept(records.next(), headerRecordNumber);
@@ -142,8 +171,7 @@ public final class CsvValidator implements Validator {
                     "",
                     "/envelope/end",
                     "marker",
-                    "CSV-Datei enthält keinen gültigen Endmarker '"
-                            + profile.envelope().end() + "'"));
+                    ValidationMessages.text(language, "envelopeEnd", profile.envelope().end())));
         }
         checks.finish();
     }
@@ -152,18 +180,20 @@ public final class CsvValidator implements Validator {
         private final CsvProfile profile;
         private final List<Finding> findings;
         private final List<Integer> keyColumns;
+        private final ValidationLanguage language;
         private final Map<List<String>, Long> firstRows = new HashMap<>();
         private long count;
 
-        private RowChecks(CsvProfile profile, List<Finding> findings) {
+        private RowChecks(CsvProfile profile, List<Finding> findings, ValidationLanguage language) {
             this.profile = profile;
             this.findings = findings;
+            this.language = language;
             this.keyColumns = profile.uniqueBy().stream().map(profile.header()::indexOf).toList();
         }
 
         private void accept(CSVRecord record, long headerRecordNumber) {
             count++;
-            validateRecord(record, profile, headerRecordNumber, findings);
+            validateRecord(record, profile, headerRecordNumber, findings, language);
             if (keyColumns.isEmpty() || record.size() != profile.columns().size()) {
                 return;
             }
@@ -173,20 +203,19 @@ public final class CsvValidator implements Validator {
                 findings.add(new Finding(
                         "/rows/" + (record.getRecordNumber() - headerRecordNumber - 1),
                         "/uniqueBy", "uniqueBy",
-                        "Zeile " + record.getRecordNumber() + ": Schluessel aus "
-                                + String.join(", ", profile.uniqueBy())
-                                + " bereits in Zeile " + first + " vorhanden"));
+                        ValidationMessages.text(language, "duplicate", record.getRecordNumber(),
+                                String.join(", ", profile.uniqueBy()), first)));
             }
         }
 
         private void finish() {
             if (profile.minRecords() != null && count < profile.minRecords()) {
                 findings.add(new Finding("", "/minRecords", "minRecords",
-                        count + " Datensaetze gefunden, mindestens " + profile.minRecords() + " erwartet"));
+                        ValidationMessages.text(language, "minRecords", count, profile.minRecords())));
             }
             if (profile.maxRecords() != null && count > profile.maxRecords()) {
                 findings.add(new Finding("", "/maxRecords", "maxRecords",
-                        count + " Datensaetze gefunden, hoechstens " + profile.maxRecords() + " erwartet"));
+                        ValidationMessages.text(language, "maxRecords", count, profile.maxRecords())));
             }
         }
     }
@@ -214,7 +243,8 @@ public final class CsvValidator implements Validator {
             CSVRecord record,
             CsvProfile profile,
             long headerRecordNumber,
-            List<Finding> findings
+            List<Finding> findings,
+            ValidationLanguage language
     ) {
         long recordNumber = record.getRecordNumber();
         int rowIndex = Math.toIntExact(recordNumber - headerRecordNumber - 1);
@@ -223,8 +253,8 @@ public final class CsvValidator implements Validator {
                     "/rows/" + rowIndex,
                     "/columns",
                     "columns",
-                    "Zeile " + recordNumber + ": " + record.size()
-                            + " Spalten gefunden, " + profile.columns().size() + " erwartet"));
+                    ValidationMessages.text(language, "columns", recordNumber,
+                            record.size(), profile.columns().size())));
             return;
         }
 
@@ -244,21 +274,21 @@ public final class CsvValidator implements Validator {
                     path,
                     schemaPath,
                     profile.decimalSeparator(),
+                    language,
                     findings);
         }
     }
 
-    private static String compareHeader(CSVRecord actual, List<String> expected, char delimiter) {
+    private static String compareHeader(CSVRecord actual, List<String> expected, char delimiter,
+                                        ValidationLanguage language) {
         if (actual.size() != expected.size()) {
-            return "CSV-Kopfzeile enthält " + actual.size() + " Spalten, "
-                    + expected.size() + " erwartet";
+            return ValidationMessages.text(language, "headerCount", actual.size(), expected.size());
         }
         for (int index = 0; index < expected.size(); index++) {
             if (!expected.get(index).equals(actual.get(index))) {
-                return "CSV-Kopfzeile stimmt nicht mit dem Profil überein (erwartet: "
-                        + String.join(String.valueOf(delimiter), expected)
-                        + ", gefunden: " + String.join(String.valueOf(delimiter), actual)
-                        + ")";
+            return ValidationMessages.text(language, "headerMismatch",
+                    String.join(String.valueOf(delimiter), expected),
+                    String.join(String.valueOf(delimiter), actual));
             }
         }
         return null;

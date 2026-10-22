@@ -32,7 +32,10 @@ Garantien:
 - Befunde werden nach Datenpfad, Profilpfad, Regelkennung und Meldung sortiert;
 - `metadata` ist optional und erscheint nur, wenn der Validator sie liefert;
   SFTP v3 nutzt sie fuer Liefer-ID, Anzahl gepruefter Dateien, Lebenszyklusstatus
-  und Zielpfade, ohne Nutzdaten oder Zugangsdaten aufzunehmen;
+  und Zielpfade, ohne Nutzdaten oder Zugangsdaten aufzunehmen. Eine
+  erfolgreiche CSV-Korrektur ergaenzt die Anzahl entfernter Datensaetze sowie
+  die Basisnamen von Backup, Datei entfernter Datensaetze und Auditdatei;
+  absolute lokale Pfade werden nicht ausgegeben;
 - Betriebsfehler wie unlesbare Dateien oder ungueltige Schemas sind keine
   Datenbefunde und liefern Exit `2`.
 
@@ -42,7 +45,7 @@ JSON Schema nutzt Dokument-/Schemapfade wie im Beispiel.
 CSV nutzt `/rows/0/columnName` und `/columns/columnName/type`.
 Datensatzindizes zaehlen ohne Kopf- und Markersaetze; pointerrelevante Zeichen
 werden escaped. Dateibefunde koennen einen leeren `instancePath` besitzen.
-CSV-Regeln umfassen `header`, `columns`, `marker`, `required`, `type`,
+CSV-Regeln umfassen `header`, `columns`, `marker`, `fileNamePattern`, `required`, `type`,
 `pattern`, Laengen-/Zahlengrenzen, `minRecords`, `maxRecords` und `uniqueBy`.
 Fixed-Width nutzt `/records/0/fieldName`; HTTP und SFTP ergaenzen ihre
 dokumentierten Anfrage-/Antwort-/Inhaltspraefixe.
@@ -64,5 +67,9 @@ ersetzen; andere vorhandene Ausgabedateien werden ersetzt. Die CLI fragt nicht
 nach, die GUI bestaetigt das Ersetzen vorhandener Reports.
 
 TEXT beginnt mit `VALID` oder `INVALID`, danach folgen Befundzeilen.
-Meldungen sind ueberwiegend Deutsch. Automatisierung sollte `status`, `valid`,
-Pfade und `keyword` statt Meldungstext oder LED-Farbe auswerten.
+CSV-, Fixed-Width- und JSON-Schema-Inhaltspruefungen unterstuetzen deutsche und
+englische Befundtexte. Die CLI verwendet standardmaessig Deutsch und akzeptiert
+`--language de|en`; die GUI verwendet ihre ausgewaehlte Sprache. SFTP gibt die
+Auswahl an den Inhaltsvalidator weiter. Transportbefunde fuer HTTP/SFTP
+behalten ihre Adaptermeldungen. Automatisierung sollte `status`, `valid`,
+Pfade und `keyword` statt lokalisierter Texte oder LED-Farben auswerten.

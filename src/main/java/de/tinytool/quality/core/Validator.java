@@ -16,4 +16,10 @@ import java.nio.file.Path;
 public interface Validator {
 
     ValidationResult validate(Path input, Path schema) throws ValidationException;
+
+    /** Validates with an explicitly selected finding language. */
+    default ValidationResult validate(Path input, Path schema, ValidationLanguage language)
+            throws ValidationException {
+        return validate(input, schema);
+    }
 }

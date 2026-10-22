@@ -19,6 +19,7 @@ import de.tinytool.quality.core.ValidationException;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultCellEditor;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
@@ -46,6 +47,7 @@ final class CsvProfileEditor extends JDialog {
     private final JTable table;
     private final Map<String, JTextField> fields = new LinkedHashMap<>();
     private final JTextArea uniqueBy = new JTextArea(2, 30);
+    private final JCheckBox correction = new JCheckBox();
     private final Path input;
     private final Path originalProfile;
     private final UiLanguage language;
@@ -87,6 +89,13 @@ final class CsvProfileEditor extends JDialog {
                 profile.path("minRecords").asText(""));
         addField(settings, t("Max. Datensätze (optional)", "Max. records (optional)"), "maxRecords",
                 profile.path("maxRecords").asText(""));
+        addField(settings, t("Dateinamenmuster (optional)", "File name pattern (optional)"), "fileNamePattern",
+                profile.path("fileNamePattern").asText(""));
+        correction.setSelected(profile.path("correction").path("enabled").asBoolean(false));
+        correction.setText(t("Fehlerhafte Datensätze entfernen und protokollieren",
+                "Remove and log invalid records"));
+        settings.add(new JLabel(t("Korrektur (standardmäßig aus)", "Correction (off by default)")));
+        settings.add(correction);
         JPanel top = new JPanel(new BorderLayout(8, 8));
         top.add(settings, BorderLayout.NORTH);
         JPanel key = new JPanel(new BorderLayout(8, 8));
@@ -106,9 +115,11 @@ final class CsvProfileEditor extends JDialog {
         bottom.add(new JLabel("<html>" + t(
                 "Aktiv = Spaltenregeln anwenden. Kopfzeile und Spaltenanzahl bleiben verbindlich."
                         + "<br>Grenzwerte mit Dezimalpunkt. Leere Regelfelder = keine Einschränkung."
+                        + "<br>Dateinamenmuster prüft den vollständigen Basisnamen."
                         + " Speichern erzeugt ein portables CLI-/GUI-Profil.",
                 "Enabled = apply column rules. Header and column count remain mandatory."
                         + "<br>Use a decimal point for limits. Empty rule fields = no restriction."
+                        + "<br>File name pattern matches the complete basename."
                         + " Saving creates a portable CLI/GUI profile.") + "</html>"), BorderLayout.NORTH);
         JPanel actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT));
         JButton add = new JButton(t("Spalte hinzufügen", "Add column"));
@@ -176,6 +187,12 @@ final class CsvProfileEditor extends JDialog {
                 }
             }
         }
+        String fileNamePattern = fields.get("fileNamePattern").getText();
+        if (fileNamePattern.isBlank()) {
+            result.remove("fileNamePattern");
+        } else {
+            result.put("fileNamePattern", fileNamePattern);
+        }
         String begin = fields.get("begin").getText();
         String end = fields.get("end").getText();
         result.remove("envelope");
@@ -187,6 +204,7 @@ final class CsvProfileEditor extends JDialog {
             var keys = result.putArray("uniqueBy");
             uniqueBy.getText().lines().filter(line -> !line.isBlank()).forEach(keys::add);
         }
+        result.putObject("correction").put("enabled", correction.isSelected());
         new CsvValidator().checkProfile(result);
         return result;
     }

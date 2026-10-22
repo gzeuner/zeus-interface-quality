@@ -9,6 +9,7 @@
 package de.tinytool.quality.gui;
 
 import java.util.Locale;
+import de.tinytool.quality.core.ValidationLanguage;
 
 enum UiLanguage {
     DE("Deutsch", Locale.GERMAN),
@@ -28,6 +29,10 @@ enum UiLanguage {
 
     Locale locale() {
         return locale;
+    }
+
+    ValidationLanguage validationLanguage() {
+        return this == DE ? ValidationLanguage.DE : ValidationLanguage.EN;
     }
 
     @Override

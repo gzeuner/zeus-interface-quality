@@ -9,6 +9,8 @@
 package de.tinytool.quality.adapter.support;
 
 import de.tinytool.quality.core.Finding;
+import de.tinytool.quality.core.ValidationLanguage;
+import de.tinytool.quality.core.ValidationMessages;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,7 +49,8 @@ public final class ScalarValidation {
             String schemaPath,
             List<Finding> findings
     ) {
-        validateField(rawValue, recordNumber, columnName, type, rules, instancePath, schemaPath, '.', findings);
+        validateField(rawValue, recordNumber, columnName, type, rules, instancePath, schemaPath, '.',
+                ValidationLanguage.DE, findings);
     }
 
     public static void validateField(
@@ -61,6 +64,15 @@ public final class ScalarValidation {
             char decimalSeparator,
             List<Finding> findings
     ) {
+        validateField(rawValue, recordNumber, columnName, type, rules, instancePath, schemaPath,
+                decimalSeparator, ValidationLanguage.DE, findings);
+    }
+
+    public static void validateField(
+            String rawValue, long recordNumber, String columnName, ScalarType type, ScalarRules rules,
+            String instancePath, String schemaPath, char decimalSeparator,
+            ValidationLanguage language, List<Finding> findings
+    ) {
         String value = rawValue == null ? "" : rawValue;
         if (value.isEmpty()) {
             if (rules.required()) {
@@ -68,12 +80,11 @@ public final class ScalarValidation {
                         instancePath,
                         schemaPath + "/required",
                         "required",
-                        "Zeile " + recordNumber + ", Spalte " + columnName + ": Pflichtwert fehlt"));
+                        ValidationMessages.text(language, "required", recordNumber, columnName)));
             }
             return;
         }
 
-        String prefix = "Zeile " + recordNumber + ", Spalte " + columnName + ": ";
         switch (type) {
             case STRING -> {
                 int length = value.codePointCount(0, value.length());
@@ -82,14 +93,14 @@ public final class ScalarValidation {
                             instancePath,
                             schemaPath + "/minLength",
                             "minLength",
-                            prefix + "muss mindestens " + rules.minLength() + " Zeichen enthalten"));
+                            ValidationMessages.text(language, "minLength", recordNumber, columnName, rules.minLength())));
                 }
                 if (rules.maxLength() != null && length > rules.maxLength()) {
                     findings.add(new Finding(
                             instancePath,
                             schemaPath + "/maxLength",
                             "maxLength",
-                            prefix + "darf höchstens " + rules.maxLength() + " Zeichen enthalten"));
+                            ValidationMessages.text(language, "maxLength", recordNumber, columnName, rules.maxLength())));
                 }
             }
             case INTEGER -> {
@@ -98,9 +109,9 @@ public final class ScalarValidation {
                             instancePath,
                             schemaPath + "/type",
                             "type",
-                            prefix + "'" + value + "' ist keine ganze Zahl"));
+                            ValidationMessages.text(language, "integer", recordNumber, columnName, value)));
                 } else {
-                    addNumericBounds(new BigDecimal(value), rules, prefix, instancePath, schemaPath, findings);
+                    addNumericBounds(new BigDecimal(value), rules, recordNumber, columnName, language, instancePath, schemaPath, findings);
                 }
             }
             case DECIMAL -> {
@@ -108,7 +119,9 @@ public final class ScalarValidation {
                     addNumericBounds(
                             parseDecimal(value, decimalSeparator),
                             rules,
-                            prefix,
+                            recordNumber,
+                            columnName,
+                            language,
                             instancePath,
                             schemaPath,
                             findings);
@@ -117,7 +130,7 @@ public final class ScalarValidation {
                             instancePath,
                             schemaPath + "/type",
                             "type",
-                            prefix + "'" + value + "' ist keine Dezimalzahl"));
+                            ValidationMessages.text(language, "decimal", recordNumber, columnName, value)));
                 }
             }
             case DATE -> {
@@ -128,7 +141,7 @@ public final class ScalarValidation {
                             instancePath,
                             schemaPath + "/type",
                             "type",
-                            prefix + "'" + value + "' ist kein gültiges Datum im Format JJJJ-MM-TT"));
+                            ValidationMessages.text(language, "date", recordNumber, columnName, value)));
                 }
             }
             case TIME -> {
@@ -139,7 +152,7 @@ public final class ScalarValidation {
                             instancePath,
                             schemaPath + "/type",
                             "type",
-                            prefix + "'" + value + "' ist keine gültige Uhrzeit im Format HH:mm"));
+                            ValidationMessages.text(language, "time", recordNumber, columnName, value)));
                 }
             }
             case EMAIL -> {
@@ -148,7 +161,7 @@ public final class ScalarValidation {
                             instancePath,
                             schemaPath + "/type",
                             "type",
-                            prefix + "'" + value + "' ist keine gültige E-Mail-Adresse"));
+                            ValidationMessages.text(language, "email", recordNumber, columnName, value)));
                 }
             }
         }
@@ -158,7 +171,7 @@ public final class ScalarValidation {
                     instancePath,
                     schemaPath + "/pattern",
                     "pattern",
-                    prefix + "entspricht nicht dem vorgegebenen Muster"));
+                    ValidationMessages.text(language, "pattern", recordNumber, columnName)));
         }
     }
 
@@ -183,7 +196,9 @@ public final class ScalarValidation {
     private static void addNumericBounds(
             BigDecimal value,
             ScalarRules rules,
-            String prefix,
+            long recordNumber,
+            String columnName,
+            ValidationLanguage language,
             String instancePath,
             String schemaPath,
             List<Finding> findings
@@ -193,14 +208,14 @@ public final class ScalarValidation {
                     instancePath,
                     schemaPath + "/minimum",
                     "minimum",
-                    prefix + "muss mindestens " + plain(rules.minimum()) + " sein"));
+                    ValidationMessages.text(language, "minimum", recordNumber, columnName, plain(rules.minimum()))));
         }
         if (rules.maximum() != null && value.compareTo(rules.maximum()) > 0) {
             findings.add(new Finding(
                     instancePath,
                     schemaPath + "/maximum",
                     "maximum",
-                    prefix + "darf höchstens " + plain(rules.maximum()) + " sein"));
+                    ValidationMessages.text(language, "maximum", recordNumber, columnName, plain(rules.maximum()))));
         }
     }
 

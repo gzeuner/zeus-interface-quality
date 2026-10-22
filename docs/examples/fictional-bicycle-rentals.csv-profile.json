@@ -16,6 +16,10 @@
   "minRecords": 1,
   "maxRecords": 50,
   "uniqueBy": ["rentalId"],
+  "fileNamePattern": "^fictional-bicycle-rentals(-invalid)?\\.csv$",
+  "correction": {
+    "enabled": false
+  },
   "columns": [
     {
       "name": "rentalId",

@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Version-one profile for delimited text files.
@@ -38,12 +40,14 @@ record CsvProfile(
         CsvEnvelope envelope,
         Integer minRecords,
         Integer maxRecords,
-        List<String> uniqueBy
+        List<String> uniqueBy,
+        Pattern fileNamePattern,
+        boolean correctionEnabled
 ) {
 
     private static final Set<String> PROFILE_PROPERTIES = Set.of(
             "$id", "$schema", "format", "version", "delimiter", "decimalSeparator", "encoding",
-            "header", "columns", "envelope", "minRecords", "maxRecords", "uniqueBy");
+            "header", "columns", "envelope", "minRecords", "maxRecords", "uniqueBy", "fileNamePattern", "correction");
     private static final Set<String> COLUMN_PROPERTIES = Set.of(
             "name", "type", "enabled", "required", "minLength", "maxLength", "minimum", "maximum", "pattern");
 
@@ -106,8 +110,26 @@ record CsvProfile(
         if (!header.containsAll(uniqueBy)) {
             throw ProfileDocuments.invalid("CSV profile uniqueBy must reference existing header columns");
         }
+        String fileNamePatternText = ProfileDocuments.optionalText(root, "fileNamePattern", "CSV profile");
+        Pattern fileNamePattern = null;
+        if (fileNamePatternText != null) {
+            try {
+                fileNamePattern = Pattern.compile(fileNamePatternText);
+            } catch (PatternSyntaxException e) {
+                throw new ValidationException("CSV profile fileNamePattern is not a valid regular expression: "
+                        + e.getDescription(), e);
+            }
+        }
+        boolean correctionEnabled = false;
+        if (root.has("correction")) {
+            JsonNode correction = root.get("correction");
+            ProfileDocuments.requireObject(correction, "CSV profile correction");
+            ProfileDocuments.rejectUnknownProperties(correction, Set.of("enabled"), "CSV profile correction");
+            correctionEnabled = ProfileDocuments.optionalBoolean(correction, "enabled", false,
+                    "CSV profile correction");
+        }
         return new CsvProfile(delimiter, decimalSeparator, charset, header, columns, envelope,
-                minRecords, maxRecords, uniqueBy);
+                minRecords, maxRecords, uniqueBy, fileNamePattern, correctionEnabled);
     }
 
     private static CsvEnvelope readEnvelope(JsonNode node) throws ValidationException {

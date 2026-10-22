@@ -32,7 +32,9 @@ The contract guarantees:
 - findings are sorted by instance path, schema path, keyword, and message;
 - `metadata` is optional and appears only when the validator supplies it;
   SFTP v3 uses it for delivery identity, validated-file count, lifecycle state,
-  and final paths, without including payloads or credentials;
+  and final paths, without including payloads or credentials. A successful CSV
+  correction adds removed-record count and the basenames of the backup,
+  rejected-record file and audit file; absolute local paths are omitted;
 - operational problems such as unreadable files or invalid schemas are not validation findings and return exit code `2`.
 
 ## Paths and additional rules
@@ -41,7 +43,7 @@ JSON Schema uses document/schema pointers such as the example above.
 CSV uses `/rows/0/columnName` and `/columns/columnName/type`; row indexes exclude
 header and marker records, and pointer-sensitive characters are escaped.
 File-level findings can have an empty `instancePath`.
-CSV rules include `header`, `columns`, `marker`, `required`, `type`, `pattern`,
+CSV rules include `header`, `columns`, `marker`, `fileNamePattern`, `required`, `type`, `pattern`,
 length/numeric bounds, `minRecords`, `maxRecords` and `uniqueBy`.
 Fixed-width uses `/records/0/fieldName`; HTTP and SFTP add their documented
 request/response/content prefixes.
@@ -63,5 +65,9 @@ files and replace other existing output files. The CLI does not prompt.
 The GUI asks before replacing an existing report.
 
 TEXT output starts with `VALID` or `INVALID`, followed by finding lines.
-Finding messages are generally German; automation should use `status`,
-`valid`, paths and `keyword`, not message wording or LED colors.
+CSV, fixed-width and JSON Schema content validation support German and English
+finding messages. The CLI defaults to German and accepts `--language de|en`;
+the GUI uses its selected language. SFTP passes the choice to its content
+validator. HTTP/SFTP transport-level diagnostics retain their adapter
+messages. Automation should use `status`, `valid`, paths and `keyword`, not
+localized wording or LED colors.

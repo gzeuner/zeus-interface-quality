@@ -35,7 +35,7 @@ Garantien:
   und Zielpfade, ohne Nutzdaten oder Zugangsdaten aufzunehmen. Eine
   erfolgreiche CSV-Korrektur ergaenzt die Anzahl entfernter Datensaetze sowie
   die Basisnamen von Backup, Datei entfernter Datensaetze und Auditdatei;
-  absolute lokale Pfade werden nicht ausgegeben;
+  absolute lokale Pfade werden nicht ausgegeben; `--dry-run-correction` ergaenzt bei bestandener temporaerer Pruefung `correctionPreview` im weiterhin ungueltigen Ergebnis;
 - Betriebsfehler wie unlesbare Dateien oder ungueltige Schemas sind keine
   Datenbefunde und liefern Exit `2`.
 
@@ -73,3 +73,7 @@ englische Befundtexte. Die CLI verwendet standardmaessig Deutsch und akzeptiert
 Auswahl an den Inhaltsvalidator weiter. Transportbefunde fuer HTTP/SFTP
 behalten ihre Adaptermeldungen. Automatisierung sollte `status`, `valid`,
 Pfade und `keyword` statt lokalisierter Texte oder LED-Farben auswerten.
+
+## SARIF-Ausgabe
+
+SARIF 2.1.0 ist fuer lokale Einzeldateipruefungen verfuegbar. Ergebnisse verwenden die Regelkennung als `ruleId`, behalten den Befundtext und enthalten die absolute URI der lokalen Eingabedatei. ZEUS-Pfade `instancePath` und `schemaPath` stehen in den Ergebnis-Metadaten; Laufeigenschaften enthalten den ZEUS-Pruefstatus. SARIF gilt nicht fuer Verzeichnis-Batches oder HTTP-/SFTP-Profile. Das aggregierte JSON-Format steht separat im [Batch-Vertrag v1](validation-batch-v1.de.md).

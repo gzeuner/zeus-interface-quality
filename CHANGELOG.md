@@ -7,6 +7,24 @@ anwenderrelevante Änderungen.
 
 ## Unreleased / Unveröffentlicht
 
+### Local batch validation
+
+- Added deterministic `--input-dir`/`--glob` validation for local files, with
+  per-file continuation, aggregate JSON reports and stable exit codes.
+- Contract: [Batch report v1](docs/contracts/validation-batch-v1.md);
+  implementation notes: [Iteration 11](docs/iterations/iteration-11-batch-local-validation.md).
+
+### SARIF output
+
+- Added single-file SARIF 2.1.0 reports for CI code-scanning integrations.
+- Details: [Iteration 12](docs/iterations/iteration-12-sarif-reports.md).
+
+### CSV correction preview
+
+- Added `--dry-run-correction` to validate proposed removals in a temporary
+  file without modifying input or creating correction artifacts.
+- Details: [Iteration 13](docs/iterations/iteration-13-csv-correction-preview.md).
+
 ### Bilingual findings and traceable CSV correction
 
 - Added a central DE/EN validation message catalog with stable keys and the CLI
@@ -20,11 +38,17 @@ anwenderrelevante Änderungen.
   `.correction.json`. Existing artifacts are never overwritten.
 - Implementation notes: [Iteration 9](docs/iterations/iteration-9-bilingual-findings-and-csv-correction.md).
 
-Documentation and verification status: **2026-10-22**.
+Documentation and verification status: **2026-10-23**.
 Current Maven version: **0.1.0-SNAPSHOT**. This entry documents the working
 version and does not announce a release.
 
 ### English
+
+#### Verified in this update
+
+- Full Maven suite: 147 tests, 0 failures, 0 errors, 2 skipped (2026-10-23).
+- Batch ordering/aggregation and per-file error continuation, SARIF mapping,
+  and correction preview preservation are covered by regression tests.
 
 #### Added
 
@@ -81,6 +105,22 @@ version and does not announce a release.
 - No production SFTP access in the local example path.
 
 ### Deutsch
+
+#### In diesem Update verifiziert
+
+- Vollstaendiger Maven-Testlauf: 147 Tests, 0 Fehler, 0 Fehlschlaege,
+  2 uebersprungen (2026-10-23).
+- Regressionstests pruefen Batchsortierung und Fehlerfortsetzung, SARIF sowie
+  die unveraenderte Eingabedatei bei der Korrekturvorschau.
+
+### Batchpruefung, SARIF und Korrekturvorschau
+
+- Lokale Batchpruefung mit `--input-dir`/`--glob` und aggregiertem Report;
+  [Vertrag](docs/contracts/validation-batch-v1.de.md), [Iteration 11](docs/iterations/iteration-11-batch-local-validation.md).
+- SARIF-2.1.0-Ausgabe fuer Einzeldatei-CI-Laeufe ([Iteration 12](docs/iterations/iteration-12-sarif-reports.md)).
+- `--dry-run-correction` zur temporaer revalidierten Vorschau ([Iteration 13](docs/iterations/iteration-13-csv-correction-preview.md)).
+
+
 
 #### Zweisprachige Befunde und nachvollziehbare CSV-Korrektur
 

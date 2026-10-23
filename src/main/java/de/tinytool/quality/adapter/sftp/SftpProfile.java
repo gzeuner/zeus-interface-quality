@@ -39,10 +39,13 @@ record SftpProfile(
         String privateKeyPassphraseEnv,
         String contentFormat,
         Path contentProfile,
+        String companionContentFormat,
+        Path companionContentProfile,
         String quarantineRemoteDirectory,
         String claimRemoteDirectory,
         String archiveRemoteDirectory,
         String expectedSha256,
+        String companionSha256,
         int stabilityChecks,
         Duration stabilityDelay,
         int maxAttempts,
@@ -56,7 +59,8 @@ record SftpProfile(
             "contentFormat", "contentProfile", "quarantineRemoteDirectory", "sha256",
             "stabilityChecks", "stabilityDelaySeconds", "maxAttempts", "retryDelaySeconds",
             "connectTimeoutSeconds", "remoteDirectory", "filePattern", "companionPattern",
-            "deliveryIdPattern", "claimRemoteDirectory", "archiveRemoteDirectory");
+            "deliveryIdPattern", "claimRemoteDirectory", "archiveRemoteDirectory",
+            "companionContentFormat", "companionContentProfile", "companionSha256");
     private static final Pattern HASH = Pattern.compile("[0-9a-fA-F]{64}");
     private static final Pattern ENVIRONMENT_NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
@@ -71,7 +75,7 @@ record SftpProfile(
             throw ProfileDocuments.invalid("SFTP profile format must be 'sftp'");
         }
         int version = ProfileDocuments.requiredPositiveInteger(root, "version", "SFTP profile");
-        if (version != 1 && version != 2 && version != 3) {
+        if (version < 1 || version > 4) {
             throw ProfileDocuments.invalid("Unsupported SFTP profile version: " + version);
         }
 
@@ -117,12 +121,13 @@ record SftpProfile(
                 throw ProfileDocuments.invalid(
                         "SFTP profile version 2 does not support correlated delivery lifecycle fields");
             }
-            if (version == 3) {
+            if (version >= 3) {
                 companionFileNamePattern = optionalFileNamePattern(root, "companionPattern");
                 deliveryIdPattern = optionalDeliveryIdPattern(root);
                 if (companionFileNamePattern != null && deliveryIdPattern == null) {
                     throw ProfileDocuments.invalid(
-                            "SFTP profile version 3 requires deliveryIdPattern with companionPattern");
+                            "SFTP profile version " + version
+                                    + " requires deliveryIdPattern with companionPattern");
                 }
             }
         }
@@ -147,6 +152,23 @@ record SftpProfile(
         Path contentProfile = requiredContainedFile(
                 profileFile, root, "contentProfile", "SFTP content profile");
 
+        String companionContentFormat = null;
+        Path companionContentProfile = null;
+        if (version == 4) {
+            if (companionFileNamePattern == null) {
+                throw ProfileDocuments.invalid(
+                        "SFTP profile version 4 requires companionPattern");
+            }
+            companionContentFormat = requiredContentFormat(root, "companionContentFormat");
+            companionContentProfile = requiredContainedFile(
+                    profileFile, root, "companionContentProfile", "SFTP companion content profile");
+        } else if (root.has("companionContentFormat") || root.has("companionContentProfile")
+                || root.has("companionSha256")) {
+            throw ProfileDocuments.invalid(
+                    "companionContentFormat, companionContentProfile, and companionSha256 "
+                            + "require SFTP profile version 4");
+        }
+
         String quarantineDirectory = ProfileDocuments.optionalText(
                 root, "quarantineRemoteDirectory", "SFTP profile");
         if (quarantineDirectory != null) {
@@ -160,19 +182,18 @@ record SftpProfile(
                 root, "claimRemoteDirectory", "SFTP profile claimRemoteDirectory");
         String archiveDirectory = optionalRemoteDirectory(
                 root, "archiveRemoteDirectory", "SFTP profile archiveRemoteDirectory");
-        if (version != 3 && (claimDirectory != null || archiveDirectory != null)) {
+        if (version < 3 && (claimDirectory != null || archiveDirectory != null)) {
             throw ProfileDocuments.invalid(
-                    "claimRemoteDirectory and archiveRemoteDirectory require SFTP profile version 3");
+                    "claimRemoteDirectory and archiveRemoteDirectory require SFTP profile version 3 or later");
         }
         if ((claimDirectory == null) != (archiveDirectory == null)) {
             throw ProfileDocuments.invalid(
-                    "SFTP profile version 3 requires claimRemoteDirectory and archiveRemoteDirectory together");
+                    "SFTP profile version " + version
+                            + " requires claimRemoteDirectory and archiveRemoteDirectory together");
         }
 
-        String expectedSha256 = ProfileDocuments.optionalText(root, "sha256", "SFTP profile");
-        if (expectedSha256 != null && !HASH.matcher(expectedSha256).matches()) {
-            throw ProfileDocuments.invalid("SFTP profile sha256 must be a 64-character hexadecimal hash");
-        }
+        String expectedSha256 = optionalHash(root, "sha256");
+        String companionSha256 = version == 4 ? optionalHash(root, "companionSha256") : null;
 
         int stabilityChecks = bounded(
                 root, "stabilityChecks", 2, 1, 5, "SFTP profile");
@@ -197,10 +218,13 @@ record SftpProfile(
                 passphraseEnv,
                 contentFormat,
                 contentProfile,
+                companionContentFormat,
+                companionContentProfile,
                 quarantineDirectory,
                 claimDirectory,
                 archiveDirectory,
                 expectedSha256 == null ? null : expectedSha256.toLowerCase(Locale.ROOT),
+                companionSha256 == null ? null : companionSha256.toLowerCase(Locale.ROOT),
                 stabilityChecks,
                 Duration.ofSeconds(stabilityDelaySeconds),
                 maxAttempts,
@@ -209,7 +233,7 @@ record SftpProfile(
     }
 
     boolean directorySelection() {
-        return version == 2 || version == 3;
+        return version >= 2;
     }
 
     boolean correlatedDelivery() {
@@ -218,6 +242,35 @@ record SftpProfile(
 
     boolean lifecycleEnabled() {
         return claimRemoteDirectory != null;
+    }
+
+    Path contentProfileFor(String role) {
+        return role.equals("companion") && companionContentProfile != null
+                ? companionContentProfile : contentProfile;
+    }
+
+    String expectedSha256For(String role) {
+        return role.equals("companion") ? companionSha256 : expectedSha256;
+    }
+
+    private static String requiredContentFormat(JsonNode root, String property)
+            throws ValidationException {
+        String value = ProfileDocuments.requiredText(root, property, "SFTP profile")
+                .toLowerCase(Locale.ROOT);
+        if (!Set.of("json", "csv", "fixed-width").contains(value)) {
+            throw ProfileDocuments.invalid("SFTP profile " + property
+                    + " must be json, csv, or fixed-width");
+        }
+        return value;
+    }
+
+    private static String optionalHash(JsonNode root, String property) throws ValidationException {
+        String value = ProfileDocuments.optionalText(root, property, "SFTP profile");
+        if (value != null && !HASH.matcher(value).matches()) {
+            throw ProfileDocuments.invalid("SFTP profile " + property
+                    + " must be a 64-character hexadecimal hash");
+        }
+        return value;
     }
 
     private static Pattern readFileNamePattern(JsonNode root) throws ValidationException {

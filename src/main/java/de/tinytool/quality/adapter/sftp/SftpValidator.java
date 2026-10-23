@@ -98,11 +98,15 @@ public final class SftpValidator implements Validator {
 
         Path profileFile = LocalFiles.requireRegularFile(schema, "SFTP profile");
         SftpProfile profile = SftpProfile.read(profileFile, objectMapper);
-        Validator contentValidator = contentValidator(profile.contentFormat());
+        Validator primaryContentValidator = contentValidator(profile.contentFormat());
+        Validator companionContentValidator = profile.companionContentFormat() == null
+                ? primaryContentValidator : contentValidator(profile.companionContentFormat());
 
         Path temporaryDirectory = createTemporaryDirectory();
         try {
-            return downloadAndValidate(profile, contentValidator, temporaryDirectory, language);
+            return downloadAndValidate(
+                    profile, primaryContentValidator, companionContentValidator,
+                    temporaryDirectory, language);
         } finally {
             deleteTemporaryDirectory(temporaryDirectory);
         }
@@ -110,7 +114,8 @@ public final class SftpValidator implements Validator {
 
     private ValidationResult downloadAndValidate(
             SftpProfile profile,
-            Validator contentValidator,
+            Validator primaryContentValidator,
+            Validator companionContentValidator,
             Path temporaryDirectory,
             ValidationLanguage language
     ) throws ValidationException {
@@ -150,22 +155,27 @@ public final class SftpValidator implements Validator {
                                 "Remote SFTP file changed while it was being downloaded");
                     }
 
-                    if (index == 0 && profile.expectedSha256() != null) {
+                    String expectedSha256 = profile.expectedSha256For(selectedFile.role());
+                    if (expectedSha256 != null) {
                         String actualSha256 = sha256(temporaryFile);
-                        if (!profile.expectedSha256().equalsIgnoreCase(actualSha256)) {
+                        if (!expectedSha256.equalsIgnoreCase(actualSha256)) {
+                            boolean companion = selectedFile.role().equals("companion");
                             findings.add(new Finding(
-                                    "/remote/hash",
-                                    "/sha256",
+                                    companion ? "/remote/companion/hash" : "/remote/hash",
+                                    companion ? "/companionSha256" : "/sha256",
                                     "sha256",
                                     "SHA-256-Prüfsumme stimmt nicht mit dem SFTP-Profil überein"));
                             break;
                         }
                     }
 
-                    ValidationResult contentResult = contentValidator instanceof CsvValidator csvValidator
-                            ? csvValidator.validate(temporaryFile, profile.contentProfile(),
+                    Validator selectedValidator = selectedFile.role().equals("companion")
+                            ? companionContentValidator : primaryContentValidator;
+                    Path selectedContentProfile = profile.contentProfileFor(selectedFile.role());
+                    ValidationResult contentResult = selectedValidator instanceof CsvValidator csvValidator
+                            ? csvValidator.validate(temporaryFile, selectedContentProfile,
                                     fileName(selectedFile.remotePath()), language)
-                            : contentValidator.validate(temporaryFile, profile.contentProfile(), language);
+                            : selectedValidator.validate(temporaryFile, selectedContentProfile, language);
                     if (!contentResult.isValid()) {
                         findings.addAll(prefixContentFindings(
                                 contentResult, selectedFile, profile.version() == 1));

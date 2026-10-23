@@ -87,7 +87,8 @@ flowchart TB
 
 The existing SFTP work covers an exact remote file (v1), bounded polling of a
 remote directory with exactly one matching regular file (v2), and a correlated
-delivery with an optional companion file (v3). V3 adds delivery identity,
+delivery with an optional companion file (v3). V4 supports a required companion
+file with its own content format, profile, and optional SHA-256. V3 adds delivery identity,
 atomic claim and recovery, success archiving, and lifecycle metadata in the
 report. All versions verify a stable remote snapshot, can compare SHA-256,
 download into a temporary directory, and delegate content checks to JSON, CSV,
@@ -96,6 +97,8 @@ and [v3 contract](docs/contracts/sftp-profile-v3.md). These CLI features remain
 outside the local GUI workflow.
 An interrupted v3 claim can resume when its matching file is still incoming;
 incomplete or ambiguous deliveries are left untouched and reported as invalid.
+See the [v4 contract](docs/contracts/sftp-profile-v4.md) for mixed-format
+deliveries.
 
 Keep local input files, rule files and generated reports in the Git-ignored
 `data/` and `reports/` directories. The GUI validates local files only; use
@@ -342,7 +345,8 @@ batch runs.
   key authentication, optional hash and opt-in quarantine. The
   [v2](docs/contracts/sftp-profile-v2.md) and
   [v3](docs/contracts/sftp-profile-v3.md) contracts cover directory selection
-  and correlated delivery lifecycle.
+  and correlated delivery lifecycle. [v4](docs/contracts/sftp-profile-v4.md)
+  adds per-file validation profiles and companion digest checks.
 - FTP, XML, YAML-specific syntax and general multi-file business rules are not
   implemented. The CLI is not a sandbox for hostile or concurrently modified files.
 
@@ -354,7 +358,7 @@ batch runs.
 - Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
 - Batch report contract: [English](docs/contracts/validation-batch-v1.md) / [German](docs/contracts/validation-batch-v1.de.md)
 - [Release checklist](docs/release-checklist.md)
-- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md), [crash recovery and release readiness](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md), [SFTP partial claim recovery](docs/iterations/iteration-19-sftp-partial-claim-recovery.md)
+- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md), [crash recovery and release readiness](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md), [SFTP partial claim recovery](docs/iterations/iteration-19-sftp-partial-claim-recovery.md), [SFTP v4 mixed-format delivery](docs/iterations/iteration-20-sftp-v4-mixed-format-delivery.md)
 - [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
   historical records; their scope statements and test counts describe those
   iterations, not the current feature set.

@@ -92,7 +92,9 @@ flowchart TB
 Die vorhandene SFTP-Erweiterung unterstützt außerdem die deterministische
 Verzeichnisauswahl (Profil v2) und korrelierte Lieferungen mit Claim-, Recovery-
 und Archivschritten (Profil v3). Siehe [SFTP-Vertrag v2](docs/contracts/sftp-profile-v2.md)
-und [SFTP-Vertrag v3](docs/contracts/sftp-profile-v3.md). Diese CLI-Funktionen
+und [SFTP-Vertrag v3](docs/contracts/sftp-profile-v3.md). Profil v4 erlaubt
+Begleitdateien mit eigenem Format, Prüfprofil und optionaler SHA-256-Prüfsumme
+([Vertrag v4](docs/contracts/sftp-profile-v4.de.md)). Diese CLI-Funktionen
 gehören nicht zum lokalen GUI-Ablauf.
 Ein unterbrochener Claim kann fortgesetzt werden, wenn die passende Datei noch
 im Eingangsverzeichnis liegt. Unvollständige oder mehrdeutige Lieferungen
@@ -353,7 +355,8 @@ dateiübergreifend. `--dry-run-correction` bleibt auch im Batch schreibgeschütz
   strikte Hostkeys, Schlüsselanmeldung, optionaler Hash und explizite
   Quarantäne. Die Verträge [v2](docs/contracts/sftp-profile-v2.md) und
   [v3](docs/contracts/sftp-profile-v3.md) beschreiben Verzeichnisauswahl und
-  korrelierte Lieferungen.
+  korrelierte Lieferungen. [v4](docs/contracts/sftp-profile-v4.de.md) ergänzt
+  dateispezifische Prüfprofile und Companion-Prüfsummen.
 - FTP, XML, YAML-spezifische Syntax und allgemeine Mehrdatei-Fachregeln sind
   nicht implementiert. Die CLI ist keine Sandbox für feindliche oder
   gleichzeitig veränderte Dateien.

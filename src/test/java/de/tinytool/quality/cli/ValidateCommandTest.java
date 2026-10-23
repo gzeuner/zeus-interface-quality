@@ -19,12 +19,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.nio.file.FileSystemException;
 import java.util.Objects;
 import java.util.Locale;
 
 import picocli.CommandLine;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class ValidateCommandTest {
 
@@ -144,6 +146,35 @@ class ValidateCommandTest {
         assertThat(batch.path("results").size()).isEqualTo(2);
         assertThat(batch.at("/results/0/relativePath").asText()).isEqualTo("nested/a-valid.csv");
         assertThat(batch.at("/results/1/relativePath").asText()).isEqualTo("z-valid.csv");
+    }
+
+    @Test
+    void batchSkipsFileSymlinksSoCorrectionCannotModifyOutsideInputRoot(@TempDir Path directory) throws Exception {
+        Path inputs = Files.createDirectory(directory.resolve("inputs"));
+        Path externalInput = Files.writeString(directory.resolve("external.csv"), "code\nnot-an-integer\n");
+        boolean linked;
+        try {
+            Files.createSymbolicLink(inputs.resolve("linked.csv"), externalInput);
+            linked = Files.isSymbolicLink(inputs.resolve("linked.csv"));
+        } catch (UnsupportedOperationException | FileSystemException e) {
+            linked = false;
+        }
+        assumeTrue(linked, "File symlinks are unavailable on this system");
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":",","encoding":"UTF-8",
+                 "header":["code"],"columns":[{"name":"code","type":"integer","required":true}],
+                 "correction":{"enabled":true}}
+                """);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input-dir",
+                inputs.toString(), "--glob", "*.csv", "--local-only", "--report", "json");
+
+        assertThat(code).isEqualTo(2);
+        assertThat(errors.toString()).contains("No regular files match");
+        assertThat(Files.readString(externalInput)).isEqualTo("code\nnot-an-integer\n");
+        assertThat(Files.exists(directory.resolve("external.csv.original.bak"))).isFalse();
     }
 
     @Test

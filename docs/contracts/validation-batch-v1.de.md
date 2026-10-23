@@ -27,6 +27,10 @@ enthalten `error` und keine Befunde. Der Gesamtstatus ist `ERROR`, sobald ein
 Betriebsfehler auftritt, sonst `INVALID`, wenn mindestens eine Datei ungueltig
 ist, andernfalls `VALID`; `valid` ist nur bei `VALID` wahr.
 
+Symbolische Links werden bei der Batchsuche ausgeschlossen, auch bei
+rekursiven Laeufen. Die Verzeichnissuche folgt keinen verlinkten Ordnern;
+verlinkte Dateien werden weder geprueft noch durch Batchkorrekturen geaendert.
+
 Exitcodes: `0`, wenn alle Dateien gueltig sind; `1`, wenn mindestens eine
 ungueltig ist und kein Betriebsfehler auftrat; `2` bei Start- oder
 dateibezogenem Betriebsfehler. Ein Dateifehler stoppt die folgenden Pruefungen

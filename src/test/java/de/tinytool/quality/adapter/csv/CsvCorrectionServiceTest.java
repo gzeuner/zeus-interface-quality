@@ -43,6 +43,40 @@ class CsvCorrectionServiceTest {
     }
 
     @Test
+    void previewExplainsWhenExistingArtifactsBlockCorrection(@TempDir Path directory) throws Exception {
+        Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\nnot-an-integer\n");
+        Path existing = Files.writeString(directory.resolve("input.csv.correction.json"), "preserve me");
+        ValidationResult initial = validator.validate(input, profile, ValidationLanguage.EN);
+
+        ValidationResult preview = correction.preview(input, profile, ValidationLanguage.EN, initial);
+
+        assertThat(preview.isValid()).isFalse();
+        assertThat(preview.metadata().get("correctionPreview").toString())
+                .contains("eligible=false", "input.csv.correction.json");
+        assertThat(Files.readString(existing)).isEqualTo("preserve me");
+        assertThat(Files.readString(input)).isEqualTo("code\nnot-an-integer\n");
+    }
+
+    @Test
+    void activeCorrectionLockBlocksPreviewAndIsPreserved(@TempDir Path directory) throws Exception {
+        Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\nnot-an-integer\n");
+        Path lock = Files.writeString(directory.resolve("input.csv.correction.lock"), "active");
+        ValidationResult initial = validator.validate(input, profile, ValidationLanguage.EN);
+
+        ValidationResult preview = correction.preview(input, profile, ValidationLanguage.EN, initial);
+        assertThat(preview.metadata().get("correctionPreview").toString())
+                .contains("eligible=false", "input.csv.correction.lock");
+        assertThatThrownBy(() -> correction.correct(input, profile, ValidationLanguage.EN, initial))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("already exist");
+
+        assertThat(Files.readString(lock)).isEqualTo("active");
+        assertThat(Files.readString(input)).isEqualTo("code\nnot-an-integer\n");
+    }
+
+    @Test
     void removesInvalidRowsAndKeepsOriginalRejectedRowsAndAudit(@TempDir Path directory) throws Exception {
         Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
         byte[] original = "code\r\n1\r\nnot-an-integer\r\n2\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);

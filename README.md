@@ -317,6 +317,9 @@ exit $LASTEXITCODE
 Batch reports use `zeus-validation-batch-v1` and contain one result per file,
 including its `relativePath`. SARIF batches combine findings into one run and
 point each result to its source file.
+Batch discovery skips symbolic links, including linked files that could point
+outside the selected input directory. Correction previews report existing
+sidecars in `blockedBy` and mark the proposal as ineligible.
 Exit `0` means all files are valid, `1` means at least one file is invalid,
 and `2` means at least one file had an operational error or the batch could not
 start. `--input-dir` accepts local formats only; it does not compare records
@@ -348,7 +351,7 @@ batch runs.
 - Examples: [English](docs/examples/README.md) / [German](docs/examples/README.de.md)
 - Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
 - Batch report contract: [English](docs/contracts/validation-batch-v1.md) / [German](docs/contracts/validation-batch-v1.de.md)
-- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md)
+- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md)
 - [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
   historical records; their scope statements and test counts describe those
   iterations, not the current feature set.

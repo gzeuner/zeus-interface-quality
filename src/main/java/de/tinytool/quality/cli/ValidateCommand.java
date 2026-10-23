@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
@@ -221,7 +222,7 @@ public final class ValidateCommand implements Callable<Integer> {
         int depth = recursive ? Integer.MAX_VALUE : 1;
         try (var stream = Files.walk(directory, depth)) {
             stream.filter(path -> !path.equals(directory))
-                    .filter(Files::isRegularFile)
+                    .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
                     .filter(path -> matcher.matches(path.getFileName()))
                     .forEach(files::add);
         }

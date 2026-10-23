@@ -16,7 +16,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.CodingErrorAction;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -51,15 +53,17 @@ public final class CsvCorrectionService {
         Path backup = source.resolveSibling(source.getFileName() + ".original.bak");
         Path rejected = source.resolveSibling(source.getFileName() + ".rejected.csv");
         Path audit = source.resolveSibling(source.getFileName() + ".correction.json");
+        Path lock = source.resolveSibling(source.getFileName() + ".correction.lock");
         Path directory = source.getParent();
-        Path correctedTemp = null, rejectedTemp = null, auditTemp = null;
-        boolean committed = false;
-        boolean artifactsReserved = false;
+        Path correctedTemp = null, rejectedTemp = null, auditTemp = null, backupTemp = null;
+        boolean committed = false, preserveArtifacts = false;
+        boolean ownsLock = false, ownsBackup = false, ownsRejected = false, ownsAudit = false;
         try {
-            if (Files.exists(backup) || Files.exists(rejected) || Files.exists(audit)) {
+            Files.createFile(lock);
+            ownsLock = true;
+            if (!existingOutputArtifacts(source).isEmpty()) {
                 throw new IOException("Correction artifacts already exist; refusing to overwrite them.");
             }
-            artifactsReserved = true;
             List<List<String>> records = readRecords(source, profile);
             int headerIndex = profile.envelope() == null ? 0 : 1;
             int firstDataIndex = headerIndex + 1;
@@ -69,6 +73,7 @@ public final class CsvCorrectionService {
             correctedTemp = Files.createTempFile(directory, ".zeus-corrected-", ".tmp");
             rejectedTemp = Files.createTempFile(directory, ".zeus-rejected-", ".tmp");
             auditTemp = Files.createTempFile(directory, ".zeus-audit-", ".tmp");
+            backupTemp = Files.createTempFile(directory, ".zeus-backup-", ".tmp");
             writeRecords(correctedTemp, records, profile, rejectedRows, firstDataIndex, endIndex, false);
             writeRecords(rejectedTemp, records, profile, rejectedRows, firstDataIndex, endIndex, true);
 
@@ -95,15 +100,25 @@ public final class CsvCorrectionService {
 
             Files.move(rejectedTemp, rejected);
             rejectedTemp = null;
+            ownsRejected = true;
             Files.move(auditTemp, audit);
             auditTemp = null;
-            Files.copy(source, backup, StandardCopyOption.COPY_ATTRIBUTES);
+            ownsAudit = true;
+            Files.copy(source, backupTemp, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+            Files.move(backupTemp, backup);
+            backupTemp = null;
+            ownsBackup = true;
             try {
                 Files.move(correctedTemp, source, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
                 correctedTemp = null;
                 committed = true;
             } catch (IOException commitFailure) {
-                Files.copy(backup, source, StandardCopyOption.REPLACE_EXISTING);
+                try {
+                    Files.copy(backup, source, StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException restoreFailure) {
+                    commitFailure.addSuppressed(restoreFailure);
+                    preserveArtifacts = true;
+                }
                 throw commitFailure;
             }
             return ValidationResult.valid(Map.of(
@@ -111,17 +126,22 @@ public final class CsvCorrectionService {
                             "backup", backup.getFileName().toString(),
                             "rejectedRecords", rejected.getFileName().toString(),
                             "audit", audit.getFileName().toString())));
+        } catch (FileAlreadyExistsException e) {
+            throw new ValidationException(
+                    "CSV correction failed: correction artifacts already exist; refusing to overwrite them.", e);
         } catch (IOException | RuntimeException e) {
             throw new ValidationException("CSV correction failed: " + LocalFiles.safeMessage(e), e);
         } finally {
-            if (!committed && artifactsReserved) {
-                deleteQuietly(backup);
-                deleteQuietly(rejected);
-                deleteQuietly(audit);
+            if (!committed && !preserveArtifacts) {
+                if (ownsBackup) deleteQuietly(backup);
+                if (ownsRejected) deleteQuietly(rejected);
+                if (ownsAudit) deleteQuietly(audit);
             }
+            if (ownsLock) deleteQuietly(lock);
             deleteQuietly(correctedTemp);
             deleteQuietly(rejectedTemp);
             deleteQuietly(auditTemp);
+            deleteQuietly(backupTemp);
         }
     }
 
@@ -140,6 +160,13 @@ public final class CsvCorrectionService {
         if (rowsToRemove.isEmpty()) return initial;
         Path staged = null;
         try {
+            List<String> existingArtifacts = existingArtifacts(source);
+            if (!existingArtifacts.isEmpty()) {
+                Map<String, Object> metadata = new LinkedHashMap<>(initial.metadata());
+                metadata.put("correctionPreview", Map.of(
+                        "eligible", false, "blockedBy", existingArtifacts));
+                return ValidationResult.invalid(initial.findings(), metadata);
+            }
             List<List<String>> records = readRecords(source, profile);
             int headerIndex = profile.envelope() == null ? 0 : 1;
             int firstDataIndex = headerIndex + 1;
@@ -151,7 +178,8 @@ public final class CsvCorrectionService {
                     source.getFileName().toString(), language);
             if (!after.isValid()) return initial;
             Map<String, Object> metadata = new LinkedHashMap<>(initial.metadata());
-            metadata.put("correctionPreview", Map.of("removedRecords", rowsToRemove.size(),
+            metadata.put("correctionPreview", Map.of("eligible", true,
+                    "removedRecords", rowsToRemove.size(),
                     "wouldCreate", List.of(source.getFileName() + ".original.bak",
                             source.getFileName() + ".rejected.csv", source.getFileName() + ".correction.json")));
             return ValidationResult.invalid(initial.findings(), metadata);
@@ -160,6 +188,22 @@ public final class CsvCorrectionService {
         } finally {
             deleteQuietly(staged);
         }
+    }
+
+    private static List<String> existingArtifacts(Path source) {
+        List<String> names = new ArrayList<>(existingOutputArtifacts(source));
+        Path lock = source.resolveSibling(source.getFileName() + ".correction.lock");
+        if (Files.exists(lock, LinkOption.NOFOLLOW_LINKS)) names.add(lock.getFileName().toString());
+        return List.copyOf(names);
+    }
+
+    private static List<String> existingOutputArtifacts(Path source) {
+        List<String> names = new ArrayList<>();
+        for (String suffix : List.of(".original.bak", ".rejected.csv", ".correction.json")) {
+            Path artifact = source.resolveSibling(source.getFileName() + suffix);
+            if (Files.exists(artifact, LinkOption.NOFOLLOW_LINKS)) names.add(artifact.getFileName().toString());
+        }
+        return List.copyOf(names);
     }
 
     private static List<List<String>> readRecords(Path input, CsvProfile profile) throws IOException {

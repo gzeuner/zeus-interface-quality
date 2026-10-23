@@ -26,6 +26,10 @@ an `error` message and no findings. The top-level status is `ERROR` if any
 file has an operational error, otherwise `INVALID` if any file is invalid,
 otherwise `VALID`; `valid` is true only for `VALID`.
 
+Symbolic links are excluded from batch discovery, including recursive runs.
+Directory traversal does not follow linked directories, and linked files are
+not validated or changed by batch correction.
+
 Exit codes are `0` when every file is valid, `1` when at least one file is
 invalid and none has an operational error, and `2` for a startup or per-file
 operational error. Per-file errors do not stop later files from running.

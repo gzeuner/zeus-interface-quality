@@ -14,7 +14,7 @@ a successful check and a failing check without preparing any files.
 
 ## Current status
 
-Development snapshot: **0.1.0-SNAPSHOT**, documentation updated **2026-10-20**.
+Development snapshot: **0.1.0-SNAPSHOT**, documentation updated **2026-10-23**.
 This is not a production-release or certification claim.
 
 | Capability | Desktop GUI | CLI |
@@ -263,9 +263,10 @@ java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile 
 |---|---|
 | `validate --profile PATH` / `--schema PATH` | Local profile or JSON Schema; exactly one profile source is required |
 | `--input PATH` | Required for local formats; not used for SFTP |
+| `--input-dir DIR --glob PATTERN` | Validate matching regular files directly in one directory, in filename order; default pattern is `*` |
 | `--input-format` | `auto` (default), `json`, `csv`, `fixed-width`, `http`, `sftp`; explicit choice overrides detection |
 | `--local-only` | Rejects HTTP/SFTP formats and profiles before transport access |
-| `--report text\|json` | stdout format; default TEXT |
+| `--report text\|json\|sarif` | stdout format; default TEXT; SARIF 2.1.0 is for CI code scanning |
 | `--report-file PATH` | Also writes the same report as UTF-8; parent directory must exist |
 | `--language de/en` | Finding language; defaults to German (`de`) |
 | `gui`, `--help`, `validate --help` | Desktop entry point / command help |
@@ -279,7 +280,7 @@ input.
 | `1` | Validation completed with rule violations |
 | `2` | Operational/configuration/command error |
 
-Text/JSON reports go to stdout; operational diagnostics go to stderr.
+Text/JSON/SARIF reports go to stdout; operational diagnostics go to stderr.
 Report-file writes protect input/profile and replace other existing reports.
 Write errors return `2` without printing a successful validation report.
 On an operational failure an old report may remain: **always check the exit
@@ -295,28 +296,26 @@ For CSV profiles, `correction.enabled` controls row removal in the CLI and is
 disabled by default. The CLI does not prompt; enable it only in a profile
 intended to modify its input file. The original backup and audit artifacts are
 described in the [CSV profile contract](docs/contracts/csv-profile-v1.md).
+Use `--dry-run-correction` to validate the proposed removal in a temporary file
+and report eligible rows without changing the input or creating sidecars.
 
-Example local PowerShell pipeline script, stopping on the first nonzero result:
+Batch validation checks matching files in one directory and emits one aggregate
+report. Files are processed in filename order, and a per-file operational error
+does not prevent later files from being checked:
 
 ```powershell
 .\mvnw.cmd -o -B package
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $jar = '.\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar'
-$files = @(
-    '.\data\first.csv',
-    '.\data\second.csv'
-)
-foreach ($file in $files) {
-  $report = Join-Path '.\target' ((Get-Item -LiteralPath $file).BaseName + '.report.json')
-  java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-profile.json' --input $file --local-only --report json --report-file $report
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-}
-exit 0
+java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-profile.json' --input-dir '.\data\incoming' --glob '*.csv' --local-only --report json --report-file '.\target\batch.report.json'
+exit $LASTEXITCODE
 ```
 
-Multiple files are separate CLI invocations, not a built-in batch or cross-file
-comparison command. Replace the placeholder file names with your local CSVs
-and the matching rule file. `exit` is intended for a pipeline script.
+Batch reports use `zeus-validation-batch-v1` and contain one result per file.
+Exit `0` means all files are valid, `1` means at least one file is invalid,
+and `2` means at least one file had an operational error or the batch could not
+start. `--input-dir` is non-recursive and accepts local formats only; it does
+not compare records across files. SARIF currently applies to single-file runs.
 
 ## Additional adapters and boundaries
 
@@ -342,6 +341,8 @@ and the matching rule file. `exit` is intended for a pipeline script.
 - CSV contract: [English](docs/contracts/csv-profile-v1.md) / [German](docs/contracts/csv-profile-v1.de.md)
 - Examples: [English](docs/examples/README.md) / [German](docs/examples/README.de.md)
 - Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
+- Batch report contract: [English](docs/contracts/validation-batch-v1.md) / [German](docs/contracts/validation-batch-v1.de.md)
+- Current iterations: [batch validation](docs/iterations/iteration-11-batch-local-validation.md), [SARIF](docs/iterations/iteration-12-sarif-reports.md), [CSV correction preview](docs/iterations/iteration-13-csv-correction-preview.md)
 - [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
   historical records; their scope statements and test counts describe those
   iterations, not the current feature set.

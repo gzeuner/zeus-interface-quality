@@ -37,6 +37,14 @@ public final class LocalFiles {
         }
     }
 
+    public static Path requireDirectory(Path path, String description) throws ValidationException {
+        if (path == null) throw new ValidationException(description + " path is required");
+        Path normalized = path.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalized)) throw new ValidationException(description + " does not exist: " + normalized);
+        try { return normalized.toRealPath(); }
+        catch (IOException e) { throw new ValidationException(description + " cannot be resolved: " + normalized, e); }
+    }
+
     public static String safeMessage(Throwable exception) {
         return exception.getMessage() == null
                 ? exception.getClass().getSimpleName()

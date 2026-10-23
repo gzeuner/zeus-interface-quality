@@ -34,7 +34,7 @@ The contract guarantees:
   SFTP v3 uses it for delivery identity, validated-file count, lifecycle state,
   and final paths, without including payloads or credentials. A successful CSV
   correction adds removed-record count and the basenames of the backup,
-  rejected-record file and audit file; absolute local paths are omitted;
+  rejected-record file and audit file; absolute local paths are omitted; `--dry-run-correction` adds `correctionPreview` metadata to an invalid result when the staged correction passes;
 - operational problems such as unreadable files or invalid schemas are not validation findings and return exit code `2`.
 
 ## Paths and additional rules
@@ -71,3 +71,7 @@ the GUI uses its selected language. SFTP passes the choice to its content
 validator. HTTP/SFTP transport-level diagnostics retain their adapter
 messages. Automation should use `status`, `valid`, paths and `keyword`, not
 localized wording or LED colors.
+
+## SARIF output
+
+SARIF 2.1.0 is available for single-file local validation. Results use the finding keyword as `ruleId`, retain the finding message, and include the absolute local input URI. ZEUS `instancePath` and `schemaPath` are stored in result properties; run properties contain the ZEUS validation status. SARIF is not available for directory batches or HTTP/SFTP profiles. The aggregate batch JSON shape is specified in [batch report v1](validation-batch-v1.md).

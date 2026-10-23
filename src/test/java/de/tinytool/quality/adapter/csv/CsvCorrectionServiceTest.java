@@ -28,6 +28,21 @@ class CsvCorrectionServiceTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    void previewsEligibleCorrectionWithoutChangingInputOrCreatingArtifacts(@TempDir Path directory) throws Exception {
+        Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\n1\nnot-an-integer\n2\n");
+        String original = Files.readString(input);
+        ValidationResult initial = validator.validate(input, profile, ValidationLanguage.EN);
+
+        ValidationResult preview = correction.preview(input, profile, ValidationLanguage.EN, initial);
+
+        assertThat(preview.isValid()).isFalse();
+        assertThat(preview.metadata().get("correctionPreview").toString()).contains("removedRecords=1");
+        assertThat(Files.readString(input)).isEqualTo(original);
+        assertThat(sidecars(directory)).isEmpty();
+    }
+
+    @Test
     void removesInvalidRowsAndKeepsOriginalRejectedRowsAndAudit(@TempDir Path directory) throws Exception {
         Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
         byte[] original = "code\r\n1\r\nnot-an-integer\r\n2\r\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);

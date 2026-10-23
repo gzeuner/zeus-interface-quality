@@ -125,6 +125,43 @@ public final class CsvCorrectionService {
         }
     }
 
+    /** Validates the proposed correction in a temporary file and reports eligible rows without changing source files. */
+    public ValidationResult preview(Path input, Path profileFile, ValidationLanguage language,
+                                    ValidationResult initial) throws ValidationException {
+        Path source = LocalFiles.requireRegularFile(input, "CSV input");
+        CsvProfile profile = CsvProfile.read(LocalFiles.requireRegularFile(profileFile, "CSV profile"), mapper);
+        if (!profile.correctionEnabled() || initial.isValid()) return initial;
+        Set<Integer> rowsToRemove = new HashSet<>();
+        for (Finding finding : initial.findings()) {
+            String path = finding.instancePath();
+            if (!path.matches("/rows/[0-9]+(?:/.*)?")) return initial;
+            rowsToRemove.add(Integer.parseInt(path.split("/", 4)[2]));
+        }
+        if (rowsToRemove.isEmpty()) return initial;
+        Path staged = null;
+        try {
+            List<List<String>> records = readRecords(source, profile);
+            int headerIndex = profile.envelope() == null ? 0 : 1;
+            int firstDataIndex = headerIndex + 1;
+            int endIndex = records.size() - (profile.envelope() == null ? 0 : 1);
+            if (headerIndex >= records.size() || firstDataIndex > endIndex) return initial;
+            staged = Files.createTempFile(source.getParent(), ".zeus-preview-", ".tmp");
+            writeRecords(staged, records, profile, rowsToRemove, firstDataIndex, endIndex, false);
+            ValidationResult after = new CsvValidator(mapper).validate(staged, profileFile,
+                    source.getFileName().toString(), language);
+            if (!after.isValid()) return initial;
+            Map<String, Object> metadata = new LinkedHashMap<>(initial.metadata());
+            metadata.put("correctionPreview", Map.of("removedRecords", rowsToRemove.size(),
+                    "wouldCreate", List.of(source.getFileName() + ".original.bak",
+                            source.getFileName() + ".rejected.csv", source.getFileName() + ".correction.json")));
+            return ValidationResult.invalid(initial.findings(), metadata);
+        } catch (IOException | RuntimeException e) {
+            throw new ValidationException("CSV correction preview failed: " + LocalFiles.safeMessage(e), e);
+        } finally {
+            deleteQuietly(staged);
+        }
+    }
+
     private static List<List<String>> readRecords(Path input, CsvProfile profile) throws IOException {
         var decoder = profile.charset().newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT);

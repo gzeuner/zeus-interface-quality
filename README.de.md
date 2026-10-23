@@ -14,7 +14,7 @@ erfolgreicher und ein fehlerhafter Prüflauf ausprobieren.
 
 ## Aktueller Stand
 
-Entwicklungsstand: **0.1.0-SNAPSHOT**, Dokumentation vom **20.10.2026**.
+Entwicklungsstand: **0.1.0-SNAPSHOT**, Dokumentation vom **23.10.2026**.
 Dies ist keine Aussage über eine Produktionsfreigabe oder Zertifizierung.
 
 | Funktion | Desktop-GUI | CLI |
@@ -272,9 +272,10 @@ java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile 
 |---|---|
 | `validate --profile PATH` / `--schema PATH` | Lokales Profil/JSON Schema; genau eine Profilquelle erforderlich |
 | `--input PATH` | Für lokale Formate erforderlich; bei SFTP nicht verwendet |
+| `--input-dir DIR --glob MUSTER` | Passende reguläre Dateien direkt im Ordner alphabetisch prüfen; Standardmuster `*` |
 | `--input-format` | `auto` (Default), `json`, `csv`, `fixed-width`, `http`, `sftp`; explizite Auswahl übersteuert Erkennung |
 | `--local-only` | Sperrt HTTP-/SFTP-Formate und -Profile vor Transportzugriff |
-| `--report text\|json` | stdout-Format; Default TEXT |
+| `--report text\|json\|sarif` | stdout-Format; Default TEXT; SARIF 2.1.0 fuer CI-Code-Scanning |
 | `--report-file PATH` | Zusätzlich derselbe Report als UTF-8; Zielverzeichnis muss existieren |
 | `--language de/en` | Sprache der Befunde; Standard ist Deutsch (`de`) |
 | `gui`, `--help`, `validate --help` | Desktop-Einstieg / Befehlshilfe |
@@ -287,7 +288,8 @@ Die Argumentverarbeitung ist nicht-interaktiv; Fehler führen nicht zu Rückfrag
 | `1` | Prüfung abgeschlossen, Regelverletzungen gefunden |
 | `2` | Betriebs-, Konfigurations- oder Befehlsfehler |
 
-Reports gehen nach stdout, operative Diagnosen nach stderr. Die Reportdatei
+Text-/JSON-/SARIF-Reports gehen nach stdout, operative Diagnosen nach stderr.
+Die Reportdatei
 darf weder Eingabe noch Profil ersetzen; andere vorhandene Reports werden
 ersetzt. Schreibfehler liefern `2`, ohne einen erfolgreichen Prüfreport auf
 stdout auszugeben. Bei einem Betriebsfehler kann eine alte Reportdatei
@@ -302,31 +304,28 @@ Bei CSV-Profilen steuert `correction.enabled`, ob die CLI fehlerhafte
 Datensätze entfernt. Standard ist `false`; die CLI fragt nicht nach einer
 Bestätigung. Nur in Profilen aktivieren, die ihre Eingabedatei ändern dürfen.
 Belege und Grenzen sind im [CSV-Profilvertrag](docs/contracts/csv-profile-v1.de.md)
-beschrieben. Transportbefunde für SFTP und HTTP behalten ihre jeweiligen
+beschrieben. `--dry-run-correction` prüft die vorgeschlagene Entfernung in
+einer temporären Datei und meldet passende Zeilen, ohne Eingabe oder Belege
+zu ändern. Transportbefunde für SFTP und HTTP behalten ihre jeweiligen
 Adaptermeldungen.
 
-Lokales PowerShell-Pipeline-Skript, Abbruch beim ersten Ergebnis ungleich null:
+Batchprüfung verarbeitet passende Dateien in einem Ordner alphabetisch und
+erstellt einen gemeinsamen Report. Einzelne Betriebsfehler stoppen die weiteren
+Dateien nicht:
 
 ```powershell
 .\mvnw.cmd -o -B package
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $jar = '.\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar'
-$files = @(
-  '.\data\first.csv',
-  '.\data\second.csv'
-)
-foreach ($file in $files) {
-  $report = Join-Path '.\target' ((Get-Item -LiteralPath $file).BaseName + '.report.json')
-  java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-profile.json' --input $file --local-only --report json --report-file $report
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-}
-exit 0
+java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-profile.json' --input-dir '.\data\incoming' --glob '*.csv' --local-only --report json --report-file '.\target\batch.report.json'
+exit $LASTEXITCODE
 ```
 
-Mehrere Dateien werden mit getrennten CLI-Aufrufen geprüft; es gibt keinen
-integrierten Batch- oder Mehrdateivergleichsbefehl. Die Platzhalterdateien
-durch eigene CSVs und die passende Regeldatei ersetzen. `exit` ist für ein
-Pipeline-Skript gedacht.
+Batch-Reports verwenden `zeus-validation-batch-v1` mit einem Ergebnis je Datei.
+Exit `0` bedeutet: alle Dateien gültig; `1`: mindestens eine Datei ungültig;
+`2`: mindestens ein Betriebsfehler oder Batchstart fehlgeschlagen.
+`--input-dir` ist nicht rekursiv, verarbeitet nur lokale Formate und vergleicht
+keine Datensätze dateiübergreifend. SARIF ist derzeit fuer Einzeldateien.
 
 ## Weitere Adapter und Grenzen
 
@@ -354,6 +353,8 @@ Pipeline-Skript gedacht.
 - CSV-Vertrag: [Deutsch](docs/contracts/csv-profile-v1.de.md) / [English](docs/contracts/csv-profile-v1.md)
 - Beispiele: [Deutsch](docs/examples/README.de.md) / [English](docs/examples/README.md)
 - Reportvertrag: [Deutsch](docs/contracts/validation-report-v1.de.md) / [English](docs/contracts/validation-report-v1.md)
+- Batch-Reportvertrag: [Deutsch](docs/contracts/validation-batch-v1.de.md) / [English](docs/contracts/validation-batch-v1.md)
+- Umgesetzte Iterationen: [Batch](docs/iterations/iteration-11-batch-local-validation.md), [SARIF](docs/iterations/iteration-12-sarif-reports.md), [Korrekturvorschau](docs/iterations/iteration-13-csv-correction-preview.md)
 - [Entscheidungen](docs/decisions/) und [Iterationen](docs/iterations/) bleiben
   historische Aufzeichnungen. Dortige Funktionsgrenzen und Testzahlen beziehen
   sich auf den jeweiligen damaligen Stand.

@@ -29,6 +29,96 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ValidateCommandTest {
 
     @Test
+    void emitsSarifForSingleInput(@TempDir Path directory) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        Path report = directory.resolve("findings.sarif");
+        int code = commandLine(output, errors).execute("--schema", fixture("delivery.schema.json").toString(),
+                "--input", fixture("invalid-wrong-type.json").toString(), "--report", "sarif",
+                "--report-file", report.toString());
+        assertThat(code).isEqualTo(1);
+        var sarif = new ObjectMapper().readTree(report.toFile());
+        assertThat(sarif.path("version").asText()).isEqualTo("2.1.0");
+        assertThat(sarif.at("/runs/0/tool/driver/name").asText()).isEqualTo("ZEUS Interface Quality");
+        assertThat(sarif.at("/runs/0/results/0/ruleId").asText()).isEqualTo("type");
+        assertThat(sarif.at("/runs/0/results/0/properties/instancePath").asText()).isEqualTo("/quantity");
+    }
+
+    @Test
+    void validatesDirectoryInSortedOrderAndAggregatesResults(@TempDir Path directory) throws Exception {
+        Path inputs = Files.createDirectory(directory.resolve("inputs"));
+        Files.copy(Path.of(fixture("csv/valid-delivery.csv")), inputs.resolve("b-valid.csv"));
+        Files.copy(Path.of(fixture("csv/invalid-wrong-type.csv")), inputs.resolve("a-invalid.csv"));
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":";","encoding":"UTF-8",
+                 "header":["deliveryId","quantity","email"],"columns":[
+                 {"name":"deliveryId","type":"string","required":true},
+                 {"name":"quantity","type":"integer","required":true},
+                 {"name":"email","type":"email","required":true}]}
+                """);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        Path report = directory.resolve("batch.json");
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input-dir",
+                inputs.toString(), "--glob", "*.csv", "--local-only", "--report", "json",
+                "--report-file", report.toString());
+        assertThat(code).isEqualTo(1);
+        var batch = new ObjectMapper().readTree(report.toFile());
+        assertThat(batch.path("format").asText()).isEqualTo("zeus-validation-batch-v1");
+        assertThat(batch.path("status").asText()).isEqualTo("INVALID");
+        assertThat(batch.path("results").size()).isEqualTo(2);
+        assertThat(batch.at("/results/0/file").asText()).isEqualTo("a-invalid.csv");
+        assertThat(batch.at("/results/1/file").asText()).isEqualTo("b-valid.csv");
+    }
+
+    @Test
+    void batchContinuesAfterFileOperationalError(@TempDir Path directory) throws Exception {
+        Path inputs = Files.createDirectory(directory.resolve("inputs"));
+        Files.writeString(inputs.resolve("a-malformed.csv"), "\"unterminated\n");
+        Files.copy(Path.of(fixture("csv/valid-delivery.csv")), inputs.resolve("b-valid.csv"));
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":";","encoding":"UTF-8",
+                 "header":["deliveryId","quantity","email"],"columns":[
+                 {"name":"deliveryId","type":"string","required":true},
+                 {"name":"quantity","type":"integer","required":true},
+                 {"name":"email","type":"email","required":true}]}
+                """);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input-dir",
+                inputs.toString(), "--local-only", "--report", "json");
+        assertThat(code).isEqualTo(2);
+        var batch = new ObjectMapper().readTree(output.toString());
+        assertThat(batch.path("status").asText()).isEqualTo("ERROR");
+        assertThat(batch.at("/results/0/status").asText()).isEqualTo("ERROR");
+        assertThat(batch.at("/results/1/status").asText()).isEqualTo("VALID");
+    }
+
+    @Test
+    void dryRunCorrectionReportsPreviewAndLeavesCsvUntouched(@TempDir Path directory) throws Exception {
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\n1\nnot-an-integer\n2\n");
+        String original = Files.readString(input);
+        Path profile = Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":",","encoding":"UTF-8",
+                 "header":["code"],"columns":[{"name":"code","type":"integer","required":true}],
+                 "correction":{"enabled":true}}
+                """);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input",
+                input.toString(), "--dry-run-correction", "--report", "json");
+
+        assertThat(code).isEqualTo(1);
+        assertThat(new ObjectMapper().readTree(output.toString()).at("/metadata/correctionPreview/removedRecords").asInt())
+                .isEqualTo(1);
+        assertThat(Files.readString(input)).isEqualTo(original);
+        assertThat(Files.exists(directory.resolve("input.csv.original.bak"))).isFalse();
+        assertThat(Files.exists(directory.resolve("input.csv.rejected.csv"))).isFalse();
+        assertThat(Files.exists(directory.resolve("input.csv.correction.json"))).isFalse();
+    }
+
+    @Test
     void returnsZeroForValidInputAndWritesJsonReport() throws Exception {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();

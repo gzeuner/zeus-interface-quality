@@ -9,21 +9,33 @@ anwenderrelevante Änderungen.
 
 ### In this update / In diesem Update
 
-- Full Maven package build: 153 tests, 0 failures, 0 errors, 3 skipped
+- Full Maven package build: 154 tests, 0 failures, 0 errors, 3 skipped
   (2026-10-23). Windows skipped the file-symlink test because symlink creation
   is unavailable; CI runs that test on Linux.
-- Correction sidecar conflicts, lock handling and preview eligibility have
-  regression coverage.
+- Correction sidecar conflicts, active locks and recovery from an unlocked
+  crash-left lock file have regression coverage. Two clean Windows package
+  builds produced the same SHA-256 checksum. The packaged GUI launcher help,
+  version, bundled dependencies, LICENSE and NOTICE were checked locally.
 
 ### Correction and batch safety
 
 - Batch discovery skips symbolic links, preventing recursive correction from
   following linked files outside the selected input directory.
-- CSV correction uses an exclusive lock while staging and committing its backup,
-  rejected-row and audit files; rollback removes only artifacts owned by the run.
+- CSV correction uses an OS file lock while staging and committing its backup,
+  rejected-row and audit files. OS lock release allows a new run to reuse the
+  lock file after process interruption.
 - Correction preview identifies existing sidecars in `blockedBy` and marks the
   proposed correction ineligible.
 - Details: [Iteration 17](docs/iterations/iteration-17-correction-and-batch-safety.md).
+
+### Crash recovery and release readiness
+
+- OS file locks make correction runs exclusive and become reusable after a
+  process exits, including a crash.
+- CI is configured for Linux and Windows package, CLI smoke and repeat-build
+  checks; successful runs attach the JAR and SHA-256 checksum.
+- Added a bilingual release checklist. No version tag or release is created.
+- Details: [Iteration 18](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md).
 
 ### Recursive batch, preview, and SARIF
 
@@ -71,7 +83,7 @@ version and does not announce a release.
 
 #### Verified in this update
 
-- Full Maven suite: 153 tests, 0 failures, 0 errors, 3 skipped (2026-10-23).
+- Full Maven suite: 154 tests, 0 failures, 0 errors, 3 skipped (2026-10-23).
 - Batch ordering/aggregation and per-file error continuation, recursive discovery,
   batch SARIF mapping, symlink exclusion, correction preview eligibility and
   active correction locks are covered by tests.
@@ -132,6 +144,16 @@ version and does not announce a release.
 
 ### Deutsch
 
+#### Absturzwiederherstellung und Release-Vorbereitung
+
+- Betriebssystem-Dateilocks machen Korrekturläufe exklusiv und nach
+  Prozessabbruch wiederverwendbar.
+- CI ist für Linux und Windows mit Paket-, CLI-Smoke- und Wiederholungsbuilds
+  konfiguriert; erfolgreiche Läufe stellen JAR und SHA-256 bereit.
+- Eine zweisprachige Release-Checkliste ergänzt den Ablauf. Es wird kein Tag
+  und kein Release erstellt.
+- Details: [Iteration 18](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md).
+
 #### Korrektur- und Batch-Sicherheit
 
 - Batchlaeufe ueberspringen symbolische Links, auch bei rekursiver Suche.
@@ -148,7 +170,7 @@ version and does not announce a release.
 
 #### In diesem Update verifiziert
 
-- Vollstaendiger Maven-Paketlauf: 153 Tests, 0 Fehler, 0 Fehlschlaege,
+- Vollstaendiger Maven-Paketlauf: 154 Tests, 0 Fehler, 0 Fehlschlaege,
   3 uebersprungen (2026-10-23). Windows uebersprang den Symlinktest, weil
   Datei-Symlinks dort nicht angelegt werden konnten; CI prueft ihn unter Linux.
 - Regressionstests pruefen Batchsortierung, rekursive Suche, Fehlerfortsetzung,

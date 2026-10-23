@@ -273,6 +273,7 @@ java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile 
 | `validate --profile PATH` / `--schema PATH` | Lokales Profil/JSON Schema; genau eine Profilquelle erforderlich |
 | `--input PATH` | Für lokale Formate erforderlich; bei SFTP nicht verwendet |
 | `--input-dir DIR --glob MUSTER` | Passende reguläre Dateien direkt im Ordner alphabetisch prüfen; Standardmuster `*` |
+| `--recursive` | Unterordner von `--input-dir` einbeziehen; Reports enthalten relative Pfade |
 | `--input-format` | `auto` (Default), `json`, `csv`, `fixed-width`, `http`, `sftp`; explizite Auswahl übersteuert Erkennung |
 | `--local-only` | Sperrt HTTP-/SFTP-Formate und -Profile vor Transportzugriff |
 | `--report text\|json\|sarif` | stdout-Format; Default TEXT; SARIF 2.1.0 fuer CI-Code-Scanning |
@@ -304,14 +305,15 @@ Bei CSV-Profilen steuert `correction.enabled`, ob die CLI fehlerhafte
 Datensätze entfernt. Standard ist `false`; die CLI fragt nicht nach einer
 Bestätigung. Nur in Profilen aktivieren, die ihre Eingabedatei ändern dürfen.
 Belege und Grenzen sind im [CSV-Profilvertrag](docs/contracts/csv-profile-v1.de.md)
-beschrieben. `--dry-run-correction` prüft die vorgeschlagene Entfernung in
-einer temporären Datei und meldet passende Zeilen, ohne Eingabe oder Belege
-zu ändern. Transportbefunde für SFTP und HTTP behalten ihre jeweiligen
-Adaptermeldungen.
+beschrieben. `--dry-run-correction` prüft vorgeschlagene Entfernungen in
+temporären Dateien und meldet passende Zeilen, ohne Eingaben oder Belege
+zu ändern. Es funktioniert bei einzelnen CSV-Dateien und im Batch.
+Transportbefunde für SFTP und HTTP behalten ihre jeweiligen Adaptermeldungen.
 
-Batchprüfung verarbeitet passende Dateien in einem Ordner alphabetisch und
-erstellt einen gemeinsamen Report. Einzelne Betriebsfehler stoppen die weiteren
-Dateien nicht:
+Die Batchprüfung erstellt einen gemeinsamen JSON-, Text- oder SARIF-Report.
+Standardmäßig wird nur eine Ordnerebene geprüft; `--recursive` bezieht
+Unterordner ein. Dateien laufen in der Sortierung ihrer relativen Pfade.
+Einzelne Betriebsfehler stoppen die weiteren Dateien nicht:
 
 ```powershell
 .\mvnw.cmd -o -B package
@@ -321,11 +323,13 @@ java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-p
 exit $LASTEXITCODE
 ```
 
-Batch-Reports verwenden `zeus-validation-batch-v1` mit einem Ergebnis je Datei.
+Batch-Reports verwenden `zeus-validation-batch-v1` mit einem Ergebnis und
+`relativePath` je Datei. SARIF fasst Befunde in einem Lauf zusammen und ordnet
+jeden Befund seiner Quelldatei zu.
 Exit `0` bedeutet: alle Dateien gültig; `1`: mindestens eine Datei ungültig;
 `2`: mindestens ein Betriebsfehler oder Batchstart fehlgeschlagen.
-`--input-dir` ist nicht rekursiv, verarbeitet nur lokale Formate und vergleicht
-keine Datensätze dateiübergreifend. SARIF ist derzeit fuer Einzeldateien.
+`--input-dir` verarbeitet nur lokale Formate und vergleicht keine Datensätze
+dateiübergreifend. `--dry-run-correction` bleibt auch im Batch schreibgeschützt.
 
 ## Weitere Adapter und Grenzen
 
@@ -354,7 +358,7 @@ keine Datensätze dateiübergreifend. SARIF ist derzeit fuer Einzeldateien.
 - Beispiele: [Deutsch](docs/examples/README.de.md) / [English](docs/examples/README.md)
 - Reportvertrag: [Deutsch](docs/contracts/validation-report-v1.de.md) / [English](docs/contracts/validation-report-v1.md)
 - Batch-Reportvertrag: [Deutsch](docs/contracts/validation-batch-v1.de.md) / [English](docs/contracts/validation-batch-v1.md)
-- Umgesetzte Iterationen: [Batch](docs/iterations/iteration-11-batch-local-validation.md), [SARIF](docs/iterations/iteration-12-sarif-reports.md), [Korrekturvorschau](docs/iterations/iteration-13-csv-correction-preview.md)
+- Umgesetzte Iterationen: [rekursive Batches](docs/iterations/iteration-14-recursive-batches.md), [Batch-Korrekturvorschau](docs/iterations/iteration-15-batch-correction-preview.md), [Batch-SARIF](docs/iterations/iteration-16-batch-sarif.md)
 - [Entscheidungen](docs/decisions/) und [Iterationen](docs/iterations/) bleiben
   historische Aufzeichnungen. Dortige Funktionsgrenzen und Testzahlen beziehen
   sich auf den jeweiligen damaligen Stand.

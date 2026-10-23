@@ -76,4 +76,11 @@ Pfade und `keyword` statt lokalisierter Texte oder LED-Farben auswerten.
 
 ## SARIF-Ausgabe
 
-SARIF 2.1.0 ist fuer lokale Einzeldateipruefungen verfuegbar. Ergebnisse verwenden die Regelkennung als `ruleId`, behalten den Befundtext und enthalten die absolute URI der lokalen Eingabedatei. ZEUS-Pfade `instancePath` und `schemaPath` stehen in den Ergebnis-Metadaten; Laufeigenschaften enthalten den ZEUS-Pruefstatus. SARIF gilt nicht fuer Verzeichnis-Batches oder HTTP-/SFTP-Profile. Das aggregierte JSON-Format steht separat im [Batch-Vertrag v1](validation-batch-v1.de.md).
+SARIF 2.1.0 ist fuer lokale Einzeldatei- und Verzeichnispruefungen verfuegbar.
+Ergebnisse verwenden die Regelkennung als `ruleId`, behalten den Befundtext
+und enthalten die absolute URI der Eingabedatei. ZEUS-Pfade `instancePath` und
+`schemaPath` stehen in Ergebnis-Metadaten; Laufeigenschaften enthalten den
+Pruefstatus. Batch-SARIF fasst Befunde in einem Lauf zusammen und verwendet
+`zeus.operationalError` fuer dateibezogene Betriebsfehler. SARIF gilt nicht
+fuer HTTP-/SFTP-Profile und nicht zusammen mit `--dry-run-correction`. Das
+aggregierte JSON-Format steht separat im [Batch-Vertrag v1](validation-batch-v1.de.md).

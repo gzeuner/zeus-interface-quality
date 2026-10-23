@@ -10,41 +10,40 @@ package de.tinytool.quality.cli;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.csv.CsvCorrectionService;
+import de.tinytool.quality.adapter.csv.CsvValidator;
 import de.tinytool.quality.adapter.fixedwidth.FixedWidthValidator;
 import de.tinytool.quality.adapter.support.LocalFiles;
 import de.tinytool.quality.adapter.support.LocalOutputs;
 import de.tinytool.quality.adapter.support.ProfileDocuments;
 import de.tinytool.quality.core.ValidationException;
-import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.ValidationLanguage;
+import de.tinytool.quality.core.ValidationResult;
 import de.tinytool.quality.core.Validator;
 import de.tinytool.quality.report.JsonReportWriter;
 import de.tinytool.quality.report.ReportFormat;
-import de.tinytool.quality.report.TextReportWriter;
 import de.tinytool.quality.report.SarifReportWriter;
+import de.tinytool.quality.report.TextReportWriter;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
 
-import java.io.PrintWriter;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.io.PrintWriter;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
-import java.nio.file.DirectoryStream;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.nio.file.FileSystems;
-import java.nio.file.PathMatcher;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 
 /**
- * Validates one local input document against a format-specific local profile.
+ * Validates a local input document or batch against a format-specific profile.
  */
 @Command(
         name = "validate",
@@ -82,6 +81,9 @@ public final class ValidateCommand implements Callable<Integer> {
     @Option(names = "--glob", defaultValue = "*", paramLabel = "PATTERN",
             description = "Filename glob used with --input-dir (default: *).")
     private String glob;
+
+    @Option(names = "--recursive", description = "Search matching files in subdirectories of --input-dir.")
+    private boolean recursive;
 
     @Option(names = "--dry-run-correction", description = "Preview eligible CSV row removals without changing files.")
     private boolean dryRunCorrection;
@@ -144,7 +146,10 @@ public final class ValidateCommand implements Callable<Integer> {
         PrintWriter err = spec.commandLine().getErr();
 
         try {
-            if (inputDirectory != null) return validateDirectory(out, err);
+            if (recursive && inputDirectory == null) {
+                throw new ValidationException("--recursive requires --input-dir.");
+            }
+            if (inputDirectory != null) return validateDirectory(out);
             if (dryRunCorrection && reportFormat == ReportFormat.SARIF) {
                 throw new ValidationException("--dry-run-correction requires TEXT or JSON output.");
             }
@@ -157,8 +162,11 @@ public final class ValidateCommand implements Callable<Integer> {
             if (localOnly) {
                 requireLocalProfile();
             }
-            Validator validator = validators.validatorFor(inputFormat, schema);
             InputFormat detectedFormat = inputFormat == InputFormat.AUTO ? validators.detect(schema) : inputFormat;
+            if (dryRunCorrection && detectedFormat != InputFormat.CSV) {
+                throw new ValidationException("--dry-run-correction applies only to CSV profiles.");
+            }
+            Validator validator = validators.validatorFor(inputFormat, schema);
             if (reportFormat == ReportFormat.SARIF
                     && (detectedFormat == InputFormat.HTTP || detectedFormat == InputFormat.SFTP)) {
                 throw new ValidationException("SARIF output requires a local input format.");
@@ -196,19 +204,28 @@ public final class ValidateCommand implements Callable<Integer> {
         }
     }
 
-    private Integer validateDirectory(PrintWriter out, PrintWriter err) throws IOException, ValidationException {
+    private Integer validateDirectory(PrintWriter out) throws IOException, ValidationException {
         if (schema == null) throw new ValidationException("Specify a local --profile or --schema.");
         if (input != null) throw new ValidationException("Use either --input or --input-dir, not both.");
-        if (reportFormat == ReportFormat.SARIF) throw new ValidationException("SARIF output is not supported with --input-dir yet.");
-        if (dryRunCorrection) throw new ValidationException("--dry-run-correction cannot be combined with --input-dir.");
+        if (dryRunCorrection && reportFormat == ReportFormat.SARIF) {
+            throw new ValidationException("--dry-run-correction requires TEXT or JSON output.");
+        }
         Path directory = LocalFiles.requireDirectory(inputDirectory, "Input directory");
         requireLocalProfile();
+        InputFormat detectedFormat = inputFormat == InputFormat.AUTO ? validators.detect(schema) : inputFormat;
+        if (dryRunCorrection && detectedFormat != InputFormat.CSV) {
+            throw new ValidationException("--dry-run-correction applies only to CSV profiles.");
+        }
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + glob);
         List<Path> files = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) {
-            for (Path path : stream) if (Files.isRegularFile(path) && matcher.matches(path.getFileName())) files.add(path);
+        int depth = recursive ? Integer.MAX_VALUE : 1;
+        try (var stream = Files.walk(directory, depth)) {
+            stream.filter(path -> !path.equals(directory))
+                    .filter(Files::isRegularFile)
+                    .filter(path -> matcher.matches(path.getFileName()))
+                    .forEach(files::add);
         }
-        files.sort(Comparator.comparing(path -> path.getFileName().toString()));
+        files.sort(Comparator.comparing(path -> relativePath(directory, path)));
         if (files.isEmpty()) throw new ValidationException("No regular files match --glob '" + glob + "' in " + directory + ".");
         if (reportFile != null) {
             for (Path path : files) LocalOutputs.protectSources(reportFile, path, schema);
@@ -216,6 +233,7 @@ public final class ValidateCommand implements Callable<Integer> {
         ValidationLanguage selectedLanguage = ValidationLanguage.from(language);
         var mapper = new ObjectMapper();
         var rows = mapper.createArrayNode();
+        List<SarifReportWriter.FileResult> sarifResults = new ArrayList<>();
         boolean anyInvalid = false;
         boolean anyError = false;
         StringBuilder text = new StringBuilder();
@@ -223,41 +241,60 @@ public final class ValidateCommand implements Callable<Integer> {
             try {
                 Validator validator = validators.validatorFor(inputFormat, schema);
                 ValidationResult result = validator.validate(path, schema, selectedLanguage);
-                if (validator instanceof CsvValidator) result = new CsvCorrectionService().correct(path, schema, selectedLanguage, result);
+                if (dryRunCorrection && !(validator instanceof CsvValidator)) {
+                    throw new ValidationException("--dry-run-correction applies only to CSV profiles.");
+                }
+                if (validator instanceof CsvValidator) {
+                    CsvCorrectionService correction = new CsvCorrectionService();
+                    result = dryRunCorrection
+                            ? correction.preview(path, schema, selectedLanguage, result)
+                            : correction.correct(path, schema, selectedLanguage, result);
+                }
                 anyInvalid |= !result.isValid();
                 ObjectNode row = rows.addObject();
                 row.put("file", path.getFileName().toString());
+                row.put("relativePath", relativePath(directory, path));
                 row.put("status", result.status().name());
                 row.set("findings", mapper.valueToTree(result.findings()));
                 if (!result.metadata().isEmpty()) row.set("metadata", mapper.valueToTree(result.metadata()));
+                sarifResults.add(new SarifReportWriter.FileResult(path, result, null));
                 text.append(path.getFileName()).append(System.lineSeparator())
                         .append(textReportWriter.write(result));
             } catch (ValidationException | RuntimeException e) {
                 anyError = true;
                 ObjectNode row = rows.addObject();
                 row.put("file", path.getFileName().toString());
+                row.put("relativePath", relativePath(directory, path));
                 row.put("status", "ERROR");
                 row.put("error", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                sarifResults.add(new SarifReportWriter.FileResult(path, null, row.path("error").asText()));
                 text.append(path.getFileName()).append(System.lineSeparator()).append("ERROR: ")
                         .append(row.path("error").asText()).append(System.lineSeparator());
             }
         }
         String report;
-        if (reportFormat == ReportFormat.JSON) {
-            ObjectNode batch = mapper.createObjectNode();
-            batch.put("format", "zeus-validation-batch-v1");
-            batch.put("status", anyError ? "ERROR" : anyInvalid ? "INVALID" : "VALID");
-            batch.put("valid", !anyError && !anyInvalid);
-            batch.set("results", rows);
-            report = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(batch) + System.lineSeparator();
-        } else {
-            report = text.append("SUMMARY: ").append(anyError ? "ERROR" : anyInvalid ? "INVALID" : "VALID")
+        String status = anyError ? "ERROR" : anyInvalid ? "INVALID" : "VALID";
+        report = switch (reportFormat) {
+            case JSON -> {
+                ObjectNode batch = mapper.createObjectNode();
+                batch.put("format", "zeus-validation-batch-v1");
+                batch.put("status", status);
+                batch.put("valid", !anyError && !anyInvalid);
+                batch.set("results", rows);
+                yield mapper.writerWithDefaultPrettyPrinter().writeValueAsString(batch) + System.lineSeparator();
+            }
+            case SARIF -> sarifReportWriter.writeBatch(sarifResults, status) + System.lineSeparator();
+            case TEXT -> text.append("SUMMARY: ").append(status)
                     .append(" (files=").append(files.size()).append(")").append(System.lineSeparator()).toString();
-        }
+        };
         if (reportFile != null) LocalOutputs.write(reportFile, report, null, schema);
         out.print(report);
         out.flush();
         return anyError ? 2 : anyInvalid ? 1 : 0;
+    }
+
+    private static String relativePath(Path directory, Path file) {
+        return directory.relativize(file).toString().replace('\\', '/');
     }
 
     private void requireLocalProfile() throws ValidationException {

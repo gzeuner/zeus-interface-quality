@@ -7,6 +7,13 @@ anwenderrelevante Änderungen.
 
 ## Unreleased / Unveröffentlicht
 
+### Recursive batch, preview, and SARIF
+
+- Added optional recursive batch discovery with stable relative paths.
+- Added read-only CSV correction preview for batches.
+- Added one-run SARIF 2.1.0 output for batch findings and per-file operational errors.
+- Details: [Iterations 14–16](docs/iterations/iteration-14-recursive-batches.md).
+
 ### Local batch validation
 
 - Added deterministic `--input-dir`/`--glob` validation for local files, with
@@ -46,9 +53,9 @@ version and does not announce a release.
 
 #### Verified in this update
 
-- Full Maven suite: 147 tests, 0 failures, 0 errors, 2 skipped (2026-10-23).
-- Batch ordering/aggregation and per-file error continuation, SARIF mapping,
-  and correction preview preservation are covered by regression tests.
+- Full Maven suite: 150 tests, 0 failures, 0 errors, 2 skipped (2026-10-23).
+- Batch ordering/aggregation and per-file error continuation, recursive discovery,
+  batch SARIF mapping, and correction preview preservation are covered by tests.
 
 #### Added
 
@@ -106,12 +113,19 @@ version and does not announce a release.
 
 ### Deutsch
 
+#### Rekursiver Batch, Vorschau und SARIF
+
+- Optionale rekursive Dateisuche mit stabilen relativen Pfaden.
+- Schreibgeschützte CSV-Korrekturvorschau für Batchläufe.
+- Ein SARIF-2.1.0-Lauf für Batchbefunde und dateibezogene Betriebsfehler.
+- Details: [Iterationen 14–16](docs/iterations/iteration-14-recursive-batches.md).
+
 #### In diesem Update verifiziert
 
-- Vollstaendiger Maven-Testlauf: 147 Tests, 0 Fehler, 0 Fehlschlaege,
+- Vollstaendiger Maven-Testlauf: 150 Tests, 0 Fehler, 0 Fehlschlaege,
   2 uebersprungen (2026-10-23).
-- Regressionstests pruefen Batchsortierung und Fehlerfortsetzung, SARIF sowie
-  die unveraenderte Eingabedatei bei der Korrekturvorschau.
+- Regressionstests pruefen Batchsortierung, rekursive Suche, Fehlerfortsetzung,
+  SARIF und unveraenderte Eingaben bei der Korrekturvorschau.
 
 ### Batchpruefung, SARIF und Korrekturvorschau
 

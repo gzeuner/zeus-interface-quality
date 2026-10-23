@@ -8,6 +8,7 @@ import de.tinytool.quality.core.Finding;
 import de.tinytool.quality.core.ValidationResult;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.LinkedHashSet;
 
 /** Writes validation findings using SARIF 2.1.0 for CI code-scanning systems. */
@@ -15,6 +16,10 @@ public final class SarifReportWriter {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public String write(ValidationResult result, Path input) throws JsonProcessingException {
+        return writeBatch(List.of(new FileResult(input, result, null)), result.status().name());
+    }
+
+    public String writeBatch(List<FileResult> files, String status) throws JsonProcessingException {
         ObjectNode root = mapper.createObjectNode();
         root.put("$schema", "https://json.schemastore.org/sarif-2.1.0.json");
         root.put("version", "2.1.0");
@@ -23,14 +28,30 @@ public final class SarifReportWriter {
         tool.put("name", "ZEUS Interface Quality");
         tool.put("informationUri", "https://tiny-tool.de/");
         var ruleIds = new LinkedHashSet<String>();
-        for (Finding finding : result.findings()) ruleIds.add(finding.keyword());
+        for (FileResult file : files) {
+            if (file.errorMessage() != null) ruleIds.add("zeus.operationalError");
+            if (file.result() != null) {
+                for (Finding finding : file.result().findings()) ruleIds.add(finding.keyword());
+            }
+        }
         ArrayNode rules = tool.putArray("rules");
         for (String ruleId : ruleIds) {
-            rules.addObject().put("id", ruleId).putObject("shortDescription").put("text", ruleId);
+            String description = "zeus.operationalError".equals(ruleId) ? "Operational validation error" : ruleId;
+            rules.addObject().put("id", ruleId).putObject("shortDescription").put("text", description);
         }
-        run.putObject("properties").put("status", result.status().name());
+        run.putObject("properties").put("status", status);
         ArrayNode results = run.putArray("results");
-        for (Finding finding : result.findings()) {
+        for (FileResult file : files) {
+            if (file.result() == null) {
+                addOperationalError(results, file, ruleIds);
+                continue;
+            }
+            for (Finding finding : file.result().findings()) addFinding(results, file.input(), finding, ruleIds);
+        }
+        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+    }
+
+    private static void addFinding(ArrayNode results, Path input, Finding finding, LinkedHashSet<String> ruleIds) {
             ObjectNode item = results.addObject();
             item.put("ruleId", finding.keyword());
             item.put("ruleIndex", indexOf(ruleIds, finding.keyword()));
@@ -38,15 +59,27 @@ public final class SarifReportWriter {
             item.putObject("message").put("text", finding.message());
             item.putObject("properties").put("instancePath", finding.instancePath())
                     .put("schemaPath", finding.schemaPath());
-            ObjectNode location = item.putArray("locations").addObject();
-            ObjectNode physical = location.putObject("physicalLocation");
-            if (input != null) {
-                physical.putObject("artifactLocation").put("uri", input.toAbsolutePath().normalize().toUri().toASCIIString());
-            }
+            ObjectNode location = addLocation(item, input);
             location.putArray("logicalLocations").addObject()
                     .put("fullyQualifiedName", finding.instancePath());
+    }
+
+    private static void addOperationalError(ArrayNode results, FileResult file, LinkedHashSet<String> ruleIds) {
+        ObjectNode item = results.addObject();
+        item.put("ruleId", "zeus.operationalError");
+        item.put("ruleIndex", indexOf(ruleIds, "zeus.operationalError"));
+        item.put("level", "error");
+        item.putObject("message").put("text", file.errorMessage());
+        addLocation(item, file.input());
+    }
+
+    private static ObjectNode addLocation(ObjectNode item, Path input) {
+        ObjectNode location = item.putArray("locations").addObject();
+        if (input != null) {
+            location.putObject("physicalLocation").putObject("artifactLocation")
+                    .put("uri", input.toAbsolutePath().normalize().toUri().toASCIIString());
         }
-        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+        return location;
     }
 
     private static int indexOf(LinkedHashSet<String> ruleIds, String key) {
@@ -57,4 +90,6 @@ public final class SarifReportWriter {
         }
         throw new IllegalArgumentException("Unknown SARIF rule " + key);
     }
+
+    public record FileResult(Path input, ValidationResult result, String errorMessage) { }
 }

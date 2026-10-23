@@ -264,6 +264,7 @@ java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile 
 | `validate --profile PATH` / `--schema PATH` | Local profile or JSON Schema; exactly one profile source is required |
 | `--input PATH` | Required for local formats; not used for SFTP |
 | `--input-dir DIR --glob PATTERN` | Validate matching regular files directly in one directory, in filename order; default pattern is `*` |
+| `--recursive` | Include matching files in subdirectories of `--input-dir`; reports keep their relative paths |
 | `--input-format` | `auto` (default), `json`, `csv`, `fixed-width`, `http`, `sftp`; explicit choice overrides detection |
 | `--local-only` | Rejects HTTP/SFTP formats and profiles before transport access |
 | `--report text\|json\|sarif` | stdout format; default TEXT; SARIF 2.1.0 is for CI code scanning |
@@ -296,12 +297,14 @@ For CSV profiles, `correction.enabled` controls row removal in the CLI and is
 disabled by default. The CLI does not prompt; enable it only in a profile
 intended to modify its input file. The original backup and audit artifacts are
 described in the [CSV profile contract](docs/contracts/csv-profile-v1.md).
-Use `--dry-run-correction` to validate the proposed removal in a temporary file
-and report eligible rows without changing the input or creating sidecars.
+Use `--dry-run-correction` to validate proposed removals in temporary files
+and report eligible rows without changing inputs or creating sidecars. It works
+for single-file and batch CSV validation.
 
-Batch validation checks matching files in one directory and emits one aggregate
-report. Files are processed in filename order, and a per-file operational error
-does not prevent later files from being checked:
+Batch validation checks matching files and emits one aggregate JSON, text, or
+SARIF report. By default, it checks one directory level; add `--recursive` to
+include subdirectories. Files are processed by relative path, and a per-file
+operational error does not prevent later files from being checked:
 
 ```powershell
 .\mvnw.cmd -o -B package
@@ -311,11 +314,14 @@ java '-Djava.awt.headless=true' -jar $jar validate --profile '.\data\rules.csv-p
 exit $LASTEXITCODE
 ```
 
-Batch reports use `zeus-validation-batch-v1` and contain one result per file.
+Batch reports use `zeus-validation-batch-v1` and contain one result per file,
+including its `relativePath`. SARIF batches combine findings into one run and
+point each result to its source file.
 Exit `0` means all files are valid, `1` means at least one file is invalid,
 and `2` means at least one file had an operational error or the batch could not
-start. `--input-dir` is non-recursive and accepts local formats only; it does
-not compare records across files. SARIF currently applies to single-file runs.
+start. `--input-dir` accepts local formats only; it does not compare records
+across files. `--dry-run-correction` keeps row-removal previews read-only during
+batch runs.
 
 ## Additional adapters and boundaries
 
@@ -342,7 +348,7 @@ not compare records across files. SARIF currently applies to single-file runs.
 - Examples: [English](docs/examples/README.md) / [German](docs/examples/README.de.md)
 - Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
 - Batch report contract: [English](docs/contracts/validation-batch-v1.md) / [German](docs/contracts/validation-batch-v1.de.md)
-- Current iterations: [batch validation](docs/iterations/iteration-11-batch-local-validation.md), [SARIF](docs/iterations/iteration-12-sarif-reports.md), [CSV correction preview](docs/iterations/iteration-13-csv-correction-preview.md)
+- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md)
 - [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
   historical records; their scope statements and test counts describe those
   iterations, not the current feature set.

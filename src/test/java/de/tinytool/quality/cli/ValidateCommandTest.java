@@ -92,6 +92,14 @@ class ValidateCommandTest {
         assertThat(batch.path("status").asText()).isEqualTo("ERROR");
         assertThat(batch.at("/results/0/status").asText()).isEqualTo("ERROR");
         assertThat(batch.at("/results/1/status").asText()).isEqualTo("VALID");
+
+        ByteArrayOutputStream sarifOutput = new ByteArrayOutputStream();
+        int sarifCode = commandLine(sarifOutput, new ByteArrayOutputStream()).execute("--profile",
+                profile.toString(), "--input-dir", inputs.toString(), "--local-only", "--report", "sarif");
+        var sarif = new ObjectMapper().readTree(sarifOutput.toString());
+        assertThat(sarifCode).isEqualTo(2);
+        assertThat(sarif.at("/runs/0/properties/status").asText()).isEqualTo("ERROR");
+        assertThat(sarif.at("/runs/0/results/0/ruleId").asText()).isEqualTo("zeus.operationalError");
     }
 
     @Test
@@ -116,6 +124,78 @@ class ValidateCommandTest {
         assertThat(Files.exists(directory.resolve("input.csv.original.bak"))).isFalse();
         assertThat(Files.exists(directory.resolve("input.csv.rejected.csv"))).isFalse();
         assertThat(Files.exists(directory.resolve("input.csv.correction.json"))).isFalse();
+    }
+
+    @Test
+    void recursiveBatchIncludesNestedFilesAndReportsRelativePaths(@TempDir Path directory) throws Exception {
+        Path inputs = Files.createDirectory(directory.resolve("inputs"));
+        Path nested = Files.createDirectory(inputs.resolve("nested"));
+        Files.copy(Path.of(fixture("csv/valid-delivery.csv")), inputs.resolve("z-valid.csv"));
+        Files.copy(Path.of(fixture("csv/valid-delivery.csv")), nested.resolve("a-valid.csv"));
+        Path profile = csvProfile(directory, false);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input-dir",
+                inputs.toString(), "--glob", "*.csv", "--recursive", "--local-only", "--report", "json");
+
+        var batch = new ObjectMapper().readTree(output.toString());
+        assertThat(code).isZero();
+        assertThat(batch.path("results").size()).isEqualTo(2);
+        assertThat(batch.at("/results/0/relativePath").asText()).isEqualTo("nested/a-valid.csv");
+        assertThat(batch.at("/results/1/relativePath").asText()).isEqualTo("z-valid.csv");
+    }
+
+    @Test
+    void batchCorrectionPreviewDoesNotModifyInputs(@TempDir Path directory) throws Exception {
+        Path inputs = Files.createDirectory(directory.resolve("inputs"));
+        Path input = Files.copy(Path.of(fixture("csv/invalid-wrong-type.csv")), inputs.resolve("invalid.csv"));
+        byte[] original = Files.readAllBytes(input);
+        Path profile = csvProfile(directory, true);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input-dir",
+                inputs.toString(), "--glob", "*.csv", "--local-only", "--dry-run-correction", "--report", "json");
+
+        var batch = new ObjectMapper().readTree(output.toString());
+        assertThat(code).isEqualTo(1);
+        assertThat(batch.at("/results/0/metadata/correctionPreview/removedRecords").asInt()).isEqualTo(1);
+        assertThat(Files.readAllBytes(input)).containsExactly(original);
+        assertThat(Files.exists(inputs.resolve("invalid.csv.original.bak"))).isFalse();
+        assertThat(Files.exists(inputs.resolve("invalid.csv.rejected.csv"))).isFalse();
+        assertThat(Files.exists(inputs.resolve("invalid.csv.correction.json"))).isFalse();
+    }
+
+    @Test
+    void sarifBatchReportsFindingsWithPerFileLocations(@TempDir Path directory) throws Exception {
+        Path inputs = Files.createDirectory(directory.resolve("inputs"));
+        Files.copy(Path.of(fixture("csv/invalid-wrong-type.csv")), inputs.resolve("invalid.csv"));
+        Files.copy(Path.of(fixture("csv/valid-delivery.csv")), inputs.resolve("valid.csv"));
+        Path profile = csvProfile(directory, false);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+
+        int code = commandLine(output, errors).execute("--profile", profile.toString(), "--input-dir",
+                inputs.toString(), "--glob", "*.csv", "--local-only", "--report", "sarif");
+
+        var sarif = new ObjectMapper().readTree(output.toString());
+        assertThat(code).isEqualTo(1);
+        assertThat(sarif.path("runs").size()).isEqualTo(1);
+        assertThat(sarif.at("/runs/0/properties/status").asText()).isEqualTo("INVALID");
+        assertThat(sarif.at("/runs/0/results/0/locations/0/physicalLocation/artifactLocation/uri")
+                .asText()).endsWith("/invalid.csv");
+    }
+
+    private static Path csvProfile(Path directory, boolean correction) throws Exception {
+        String correctionSetting = correction ? ",\"correction\":{\"enabled\":true}" : "";
+        return Files.writeString(directory.resolve("profile.json"), """
+                {"format":"csv","version":1,"delimiter":";","encoding":"UTF-8",
+                 "header":["deliveryId","quantity","email"],"columns":[
+                 {"name":"deliveryId","type":"string","required":true},
+                 {"name":"quantity","type":"integer","required":true},
+                 {"name":"email","type":"email","required":true}]%s}
+                """.formatted(correctionSetting));
     }
 
     @Test

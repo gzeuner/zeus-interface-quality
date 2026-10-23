@@ -74,4 +74,11 @@ localized wording or LED colors.
 
 ## SARIF output
 
-SARIF 2.1.0 is available for single-file local validation. Results use the finding keyword as `ruleId`, retain the finding message, and include the absolute local input URI. ZEUS `instancePath` and `schemaPath` are stored in result properties; run properties contain the ZEUS validation status. SARIF is not available for directory batches or HTTP/SFTP profiles. The aggregate batch JSON shape is specified in [batch report v1](validation-batch-v1.md).
+SARIF 2.1.0 is available for single-file and directory validation with local
+input. Results use the finding keyword as `ruleId`, retain the finding message,
+and include the absolute input URI. ZEUS `instancePath` and `schemaPath` are
+stored in result properties; run properties contain the validation status.
+Batch SARIF combines all findings into one run and uses the `zeus.operationalError`
+rule for per-file operational failures. SARIF is not available for HTTP/SFTP
+profiles or together with `--dry-run-correction`. The aggregate batch JSON
+shape is specified in [batch report v1](validation-batch-v1.md).

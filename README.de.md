@@ -326,6 +326,10 @@ exit $LASTEXITCODE
 Batch-Reports verwenden `zeus-validation-batch-v1` mit einem Ergebnis und
 `relativePath` je Datei. SARIF fasst Befunde in einem Lauf zusammen und ordnet
 jeden Befund seiner Quelldatei zu.
+Die Batchsuche ueberspringt symbolische Links, auch wenn verlinkte Dateien
+ausserhalb des ausgewaehlten Eingabeordners liegen. Korrekturvorschauen nennen
+vorhandene Begleitdateien unter `blockedBy` und markieren den Vorschlag als
+nicht anwendbar.
 Exit `0` bedeutet: alle Dateien gültig; `1`: mindestens eine Datei ungültig;
 `2`: mindestens ein Betriebsfehler oder Batchstart fehlgeschlagen.
 `--input-dir` verarbeitet nur lokale Formate und vergleicht keine Datensätze
@@ -358,7 +362,7 @@ dateiübergreifend. `--dry-run-correction` bleibt auch im Batch schreibgeschütz
 - Beispiele: [Deutsch](docs/examples/README.de.md) / [English](docs/examples/README.md)
 - Reportvertrag: [Deutsch](docs/contracts/validation-report-v1.de.md) / [English](docs/contracts/validation-report-v1.md)
 - Batch-Reportvertrag: [Deutsch](docs/contracts/validation-batch-v1.de.md) / [English](docs/contracts/validation-batch-v1.md)
-- Umgesetzte Iterationen: [rekursive Batches](docs/iterations/iteration-14-recursive-batches.md), [Batch-Korrekturvorschau](docs/iterations/iteration-15-batch-correction-preview.md), [Batch-SARIF](docs/iterations/iteration-16-batch-sarif.md)
+- Umgesetzte Iterationen: [rekursive Batches](docs/iterations/iteration-14-recursive-batches.md), [Batch-Korrekturvorschau](docs/iterations/iteration-15-batch-correction-preview.md), [Batch-SARIF](docs/iterations/iteration-16-batch-sarif.md), [Korrektur- und Batch-Sicherheit](docs/iterations/iteration-17-correction-and-batch-safety.md)
 - [Entscheidungen](docs/decisions/) und [Iterationen](docs/iterations/) bleiben
   historische Aufzeichnungen. Dortige Funktionsgrenzen und Testzahlen beziehen
   sich auf den jeweiligen damaligen Stand.

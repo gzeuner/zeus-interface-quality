@@ -7,6 +7,24 @@ anwenderrelevante Änderungen.
 
 ## Unreleased / Unveröffentlicht
 
+### In this update / In diesem Update
+
+- Full Maven package build: 153 tests, 0 failures, 0 errors, 3 skipped
+  (2026-10-23). Windows skipped the file-symlink test because symlink creation
+  is unavailable; CI runs that test on Linux.
+- Correction sidecar conflicts, lock handling and preview eligibility have
+  regression coverage.
+
+### Correction and batch safety
+
+- Batch discovery skips symbolic links, preventing recursive correction from
+  following linked files outside the selected input directory.
+- CSV correction uses an exclusive lock while staging and committing its backup,
+  rejected-row and audit files; rollback removes only artifacts owned by the run.
+- Correction preview identifies existing sidecars in `blockedBy` and marks the
+  proposed correction ineligible.
+- Details: [Iteration 17](docs/iterations/iteration-17-correction-and-batch-safety.md).
+
 ### Recursive batch, preview, and SARIF
 
 - Added optional recursive batch discovery with stable relative paths.
@@ -53,9 +71,10 @@ version and does not announce a release.
 
 #### Verified in this update
 
-- Full Maven suite: 150 tests, 0 failures, 0 errors, 2 skipped (2026-10-23).
+- Full Maven suite: 153 tests, 0 failures, 0 errors, 3 skipped (2026-10-23).
 - Batch ordering/aggregation and per-file error continuation, recursive discovery,
-  batch SARIF mapping, and correction preview preservation are covered by tests.
+  batch SARIF mapping, symlink exclusion, correction preview eligibility and
+  active correction locks are covered by tests.
 
 #### Added
 
@@ -113,6 +132,13 @@ version and does not announce a release.
 
 ### Deutsch
 
+#### Korrektur- und Batch-Sicherheit
+
+- Batchlaeufe ueberspringen symbolische Links, auch bei rekursiver Suche.
+- Eine exklusive Sperrdatei schuetzt Korrekturen vor parallelen Laeufen;
+  Vorschauen melden vorhandene Artefakte und aktive Sperren.
+- Details: [Iteration 17](docs/iterations/iteration-17-correction-and-batch-safety.md).
+
 #### Rekursiver Batch, Vorschau und SARIF
 
 - Optionale rekursive Dateisuche mit stabilen relativen Pfaden.
@@ -122,10 +148,11 @@ version and does not announce a release.
 
 #### In diesem Update verifiziert
 
-- Vollstaendiger Maven-Testlauf: 150 Tests, 0 Fehler, 0 Fehlschlaege,
-  2 uebersprungen (2026-10-23).
+- Vollstaendiger Maven-Paketlauf: 153 Tests, 0 Fehler, 0 Fehlschlaege,
+  3 uebersprungen (2026-10-23). Windows uebersprang den Symlinktest, weil
+  Datei-Symlinks dort nicht angelegt werden konnten; CI prueft ihn unter Linux.
 - Regressionstests pruefen Batchsortierung, rekursive Suche, Fehlerfortsetzung,
-  SARIF und unveraenderte Eingaben bei der Korrekturvorschau.
+  SARIF, Symlink-Ausschluss, Vorschaukonflikte und aktive Korrektursperren.
 
 ### Batchpruefung, SARIF und Korrekturvorschau
 

@@ -267,10 +267,15 @@ nicht erlaubter Fahrradtyp und ungültige E-Mail-Adresse. Unter
 `reports/fictional-bicycle-rentals-invalid.report.json` stehen zu jedem Befund
 Datenpfad, Regelpfad und Meldung. Der Report bleibt lokal im Projekt.
 
-Eigenständiges JSON-Beispiel mit eingecheckten Beispieldaten aus dem Testlabor:
+Das [gültige JSON-Beispiel](docs/examples/delivery.json) und sein absichtlich
+[fehlerhaftes Gegenstück](docs/examples/delivery-invalid.json) verwenden
+dasselbe lokale [JSON Schema](docs/examples/delivery.schema.json):
 
 ```powershell
-java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery.json --local-only --report json
+$LASTEXITCODE  # 0: VALID
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery-invalid.json --local-only --report json
+$LASTEXITCODE  # 1: INVALID
 ```
 
 | Option / Befehl | Verhalten |

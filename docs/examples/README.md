@@ -83,15 +83,29 @@ editable CSV profile, and **Save result** exports the findings.
 
 ## JSON example from the test lab
 
-[delivery.schema.json](delivery.schema.json) is a small local schema. A
-self-contained validation run uses the checked-in test fixtures:
+[delivery.json](delivery.json) is a valid example and
+[delivery-invalid.json](delivery-invalid.json) deliberately has an empty ID, a
+zero quantity, and an unlisted property. Both use the local
+[JSON Schema](delivery.schema.json), which requires a non-empty `deliveryId`,
+a positive integer `quantity`, and no additional properties.
+
+Run the valid example:
 
 ```powershell
-java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery.json --local-only --report json
+$LASTEXITCODE  # 0: VALID
 ```
 
-The invalid CSV command above writes a JSON report under `reports/`.
-Finding messages are not the automation API; use status, paths and rule keywords.
+Run the invalid example:
+
+```powershell
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery-invalid.json --local-only --report json
+$LASTEXITCODE  # 1: INVALID with three findings
+```
+
+The schema rejects the empty ID, quantity below the minimum, and additional
+property. Finding messages are not the automation API; use status, paths and
+rule keywords.
 
 ## SFTP templates
 

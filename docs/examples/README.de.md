@@ -85,16 +85,30 @@ konfigurieren** lässt sich ein bearbeitbares CSV-Profil erstellen;
 
 ## JSON-Beispiel aus dem Testlabor
 
-[delivery.schema.json](delivery.schema.json) ist ein kleines lokales Schema.
-Ein vollständig reproduzierbarer Lauf nutzt die eingecheckten Testfixtures:
+[delivery.json](delivery.json) ist ein gültiges Beispiel;
+[delivery-invalid.json](delivery-invalid.json) enthält absichtlich eine leere
+Liefer-ID, eine Menge von null und eine nicht deklarierte Eigenschaft. Beide
+Dateien verwenden das lokale [JSON Schema](delivery.schema.json). Es verlangt
+eine nicht leere `deliveryId`, eine positive ganzzahlige `quantity` und lehnt
+zusätzliche Eigenschaften ab.
+
+Gültiges Beispiel prüfen:
 
 ```powershell
-java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery.json --local-only --report json
+$LASTEXITCODE  # 0: VALID
 ```
 
-Der obige Aufruf mit der fehlerhaften CSV schreibt den JSON-Report unter
-`reports/`. Für Automatisierung Status, Pfade und Regelkennungen statt des
-Meldungstexts auswerten.
+Absichtlich fehlerhaftes Beispiel prüfen:
+
+```powershell
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery-invalid.json --local-only --report json
+$LASTEXITCODE  # 1: INVALID mit drei Befunden
+```
+
+Das Schema meldet die leere ID, die Menge unterhalb des Mindestwerts und die
+zusätzliche Eigenschaft. Für Automatisierung Status, Pfade und Regelkennungen
+statt des Meldungstexts auswerten.
 
 ## SFTP-Vorlagen
 

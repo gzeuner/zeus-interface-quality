@@ -9,6 +9,14 @@ anwenderrelevante Änderungen.
 
 ### In this update / In diesem Update
 
+- Added valid and invalid JSON delivery samples for the checked-in JSON Schema,
+  with matching CLI walkthroughs in both language guides.
+- `JsonExampleTest` checks the valid sample and the three expected schema
+  findings in the invalid sample.
+- Full Maven package build: 161 tests, 0 failures, 0 errors, 3 skipped
+  (2026-10-23); both JSON CLI examples return their documented exit codes.
+- Details: [Iteration 21](docs/iterations/iteration-21-json-schema-showcase.md).
+
 - SFTP profile v4 validates a required companion file with its own JSON, CSV, or
   fixed-width profile, and supports a separate companion SHA-256 expectation.
 - Focused SFTP verification: 17 tests, 0 failures, 0 errors, 0 skipped.

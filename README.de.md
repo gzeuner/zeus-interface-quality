@@ -94,6 +94,9 @@ Verzeichnisauswahl (Profil v2) und korrelierte Lieferungen mit Claim-, Recovery-
 und Archivschritten (Profil v3). Siehe [SFTP-Vertrag v2](docs/contracts/sftp-profile-v2.md)
 und [SFTP-Vertrag v3](docs/contracts/sftp-profile-v3.md). Diese CLI-Funktionen
 gehören nicht zum lokalen GUI-Ablauf.
+Ein unterbrochener Claim kann fortgesetzt werden, wenn die passende Datei noch
+im Eingangsverzeichnis liegt. Unvollständige oder mehrdeutige Lieferungen
+bleiben unverändert und werden als ungültige Auswahl gemeldet.
 
 Lokale Eingabedateien, eigene Regeldateien und erzeugte Reports in den von Git
 ignorierten Ordnern `data/` und `reports/` halten. Die GUI prüft nur lokale Dateien; für

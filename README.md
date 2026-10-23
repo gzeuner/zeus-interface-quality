@@ -258,10 +258,15 @@ duplicate rental ID, an unsupported bike type and an invalid email. Inspect
 `reports/fictional-bicycle-rentals-invalid.report.json` for the data path,
 rule path and message of each finding. The report stays in the local project.
 
-Self-contained JSON example using checked-in sample data from the test lab:
+The [valid JSON sample](docs/examples/delivery.json) and its deliberately
+[invalid counterpart](docs/examples/delivery-invalid.json) use the same local
+[JSON Schema](docs/examples/delivery.schema.json):
 
 ```powershell
-java -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\src\test\resources\fixtures\delivery.schema.json --input .\src\test\resources\fixtures\valid-delivery.json --local-only --report json
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery.json --local-only --report json
+$LASTEXITCODE  # 0: VALID
+java '-Djava.awt.headless=true' -jar .\target\zeus-interface-quality-0.1.0-SNAPSHOT.jar validate --profile .\docs\examples\delivery.schema.json --input .\docs\examples\delivery-invalid.json --local-only --report json
+$LASTEXITCODE  # 1: INVALID
 ```
 
 | Option / command | Behavior |
@@ -358,7 +363,7 @@ batch runs.
 - Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
 - Batch report contract: [English](docs/contracts/validation-batch-v1.md) / [German](docs/contracts/validation-batch-v1.de.md)
 - [Release checklist](docs/release-checklist.md)
-- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md), [crash recovery and release readiness](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md), [SFTP partial claim recovery](docs/iterations/iteration-19-sftp-partial-claim-recovery.md), [SFTP v4 mixed-format delivery](docs/iterations/iteration-20-sftp-v4-mixed-format-delivery.md)
+- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md), [crash recovery and release readiness](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md), [SFTP partial claim recovery](docs/iterations/iteration-19-sftp-partial-claim-recovery.md), [SFTP v4 mixed-format delivery](docs/iterations/iteration-20-sftp-v4-mixed-format-delivery.md), [JSON Schema showcase](docs/iterations/iteration-21-json-schema-showcase.md)
 - [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
   historical records; their scope statements and test counts describe those
   iterations, not the current feature set.

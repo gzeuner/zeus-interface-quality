@@ -104,12 +104,12 @@ jobs:
         shell: pwsh
         run: |
           $jar = 'target/zeus-interface-quality-0.1.0-SNAPSHOT.jar'
-          java -jar $jar --version
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          java -jar $jar validate --schema src/test/resources/fixtures/delivery.schema.json --input src/test/resources/fixtures/valid-delivery.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          java -jar $jar validate --schema src/test/resources/fixtures/delivery.schema.json --input src/test/resources/fixtures/invalid-wrong-type.json
-          if ($LASTEXITCODE -ne 1) { exit 1 }
+          $version = Start-Process -FilePath java -ArgumentList @('-jar', $jar, '--version') -Wait -PassThru -NoNewWindow
+          if ($version.ExitCode -ne 0) { throw "--version returned $($version.ExitCode), expected 0." }
+          $valid = Start-Process -FilePath java -ArgumentList @('-jar', $jar, 'validate', '--schema', 'src/test/resources/fixtures/delivery.schema.json', '--input', 'src/test/resources/fixtures/valid-delivery.json') -Wait -PassThru -NoNewWindow
+          if ($valid.ExitCode -ne 0) { throw "Valid fixture returned $($valid.ExitCode), expected 0." }
+          $invalid = Start-Process -FilePath java -ArgumentList @('-jar', $jar, 'validate', '--schema', 'src/test/resources/fixtures/delivery.schema.json', '--input', 'src/test/resources/fixtures/invalid-wrong-type.json') -Wait -PassThru -NoNewWindow
+          if ($invalid.ExitCode -ne 1) { throw "Invalid fixture returned $($invalid.ExitCode), expected 1." }
 
       - name: Smoke test valid fixture
         if: runner.os == 'Linux'

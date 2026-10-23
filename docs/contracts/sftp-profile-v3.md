@@ -94,9 +94,10 @@ credentials.
 ## Boundaries
 
 The companion file uses the same `contentFormat` and `contentProfile` as the
-primary file. Mixed-format deliveries require a future profile version. Password
-authentication, SSH agent/config discovery, remote globbing, and semantic
-cross-file business rules remain outside this contract.
+primary file. Use [profile v4](sftp-profile-v4.md) when the companion requires a
+different format or profile, or when it needs its own SHA-256 expectation.
+Password authentication, SSH agent/config discovery, remote globbing, and
+semantic cross-file business rules remain outside this contract.
 
 ## Command and exit semantics
 

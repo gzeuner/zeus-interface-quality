@@ -318,6 +318,80 @@ class SftpValidatorTest {
     }
 
     @Test
+    void validatesMixedFormatPrimaryAndCompanionWithSeparateProfiles(@TempDir Path directory)
+            throws Exception {
+        byte[] primary = "{\"deliveryId\":\"D-200\",\"quantity\":2}"
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] companion = "deliveryId,quantity\nD-200,2\n".getBytes(StandardCharsets.UTF_8);
+        SftpRemoteMetadata fileMetadata = metadata(primary.length, 100);
+        FakeTransport transport = new FakeTransport(
+                primary,
+                List.of(fileMetadata),
+                Map.of(
+                        "/inbox", List.of(
+                                new SftpRemoteEntry("delivery-D-200.json", fileMetadata),
+                                new SftpRemoteEntry("delivery-D-200.meta.csv", fileMetadata)),
+                        "/claim", List.of(),
+                        "/archive", List.of()));
+        transport.companionContent = companion;
+        Path profile = writeMixedFormatProfile(directory, null, null);
+
+        var result = new SftpValidator(ignored -> transport).validate(null, profile);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(transport.downloadedRemotePaths)
+                .containsExactlyInAnyOrder("/claim/delivery-D-200.json", "/claim/delivery-D-200.meta.csv");
+        assertThat(transport.movedTo)
+                .anyMatch(path -> path.startsWith("/archive/delivery-D-200.json."))
+                .anyMatch(path -> path.startsWith("/archive/delivery-D-200.meta.csv."));
+    }
+
+    @Test
+    void verifiesCompanionSha256AndQuarantinesTheWholeDelivery(@TempDir Path directory)
+            throws Exception {
+        byte[] primary = "{\"deliveryId\":\"D-201\",\"quantity\":2}"
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] companion = "deliveryId,quantity\nD-201,2\n".getBytes(StandardCharsets.UTF_8);
+        SftpRemoteMetadata fileMetadata = metadata(primary.length, 100);
+        FakeTransport transport = new FakeTransport(
+                primary,
+                List.of(fileMetadata),
+                Map.of(
+                        "/inbox", List.of(
+                                new SftpRemoteEntry("delivery-D-201.json", fileMetadata),
+                                new SftpRemoteEntry("delivery-D-201.meta.csv", fileMetadata)),
+                        "/claim", List.of(),
+                        "/quarantine", List.of()));
+        transport.companionContent = companion;
+        Path profile = writeMixedFormatProfile(directory, "0".repeat(64),
+                ",\"quarantineRemoteDirectory\":\"/quarantine\"");
+
+        var result = new SftpValidator(ignored -> transport).validate(null, profile);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.findings()).anySatisfy(finding -> {
+            assertThat(finding.instancePath()).isEqualTo("/remote/companion/hash");
+            assertThat(finding.schemaPath()).isEqualTo("/companionSha256");
+        });
+        assertThat(transport.movedTo)
+                .anyMatch(path -> path.startsWith("/quarantine/delivery-D-201.json."))
+                .anyMatch(path -> path.startsWith("/quarantine/delivery-D-201.meta.csv."));
+    }
+
+    @Test
+    void requiresASeparateContentProfileForV4Companions(@TempDir Path directory) throws Exception {
+        Path profile = writeMixedFormatProfile(directory, null, null);
+        Files.writeString(profile, Files.readString(profile)
+                .replace("  \"companionContentProfile\": \"companion.csv-profile.json\",\n", ""));
+
+        assertThatThrownBy(() -> new SftpValidator(ignored -> {
+            throw new AssertionError("Profile validation must happen before opening SFTP");
+        }).validate(null, profile))
+                .isInstanceOf(Exception.class)
+                .hasMessageContaining("companionContentProfile");
+    }
+
+    @Test
     void rejectsIncompleteCorrelatedDeliveryWithoutDownloading(@TempDir Path directory) throws Exception {
         byte[] content = "{\"deliveryId\":\"D-102\",\"quantity\":4}"
                 .getBytes(StandardCharsets.UTF_8);
@@ -417,6 +491,55 @@ class SftpValidatorTest {
                 """);
     }
 
+    private static Path writeMixedFormatProfile(
+            Path directory,
+            String companionHash,
+            String quarantineOption
+    ) throws IOException {
+        writeProfileSupportFiles(directory);
+        Files.writeString(directory.resolve("companion.csv-profile.json"), """
+                {
+                  "format": "csv",
+                  "version": 1,
+                  "encoding": "UTF-8",
+                  "delimiter": ",",
+                  "header": ["deliveryId", "quantity"],
+                  "minRecords": 1,
+                  "columns": [
+                    {"name": "deliveryId", "type": "string", "required": true},
+                    {"name": "quantity", "type": "integer", "required": true, "minimum": 1}
+                  ]
+                }
+                """);
+        String hashOption = companionHash == null ? ""
+                : ",\"companionSha256\":\"" + companionHash + "\"";
+        return Files.writeString(directory.resolve("sftp-profile-v4.json"), """
+                {
+                  "format": "sftp",
+                  "version": 4,
+                  "host": "sftp.example.test",
+                  "username": "quality",
+                  "remoteDirectory": "/inbox",
+                  "filePattern": "^delivery-D-[0-9]+\\\\.json$",
+                  "companionPattern": "^delivery-D-[0-9]+\\\\.meta\\\\.csv$",
+                  "deliveryIdPattern": "^delivery-(?<deliveryId>D-[0-9]+)(?:\\\\.meta)?\\\\.(?:json|csv)$",
+                  "claimRemoteDirectory": "/claim",
+                  "archiveRemoteDirectory": "/archive",
+                  "knownHosts": "known_hosts",
+                  "privateKey": "id_ed25519",
+                  "contentFormat": "json",
+                  "contentProfile": "delivery.schema.json",
+                  "companionContentFormat": "csv",
+                  "companionContentProfile": "companion.csv-profile.json",
+                  "stabilityChecks": 1,
+                  "stabilityDelaySeconds": 0,
+                  "maxAttempts": 1,
+                  "retryDelaySeconds": 0%s%s
+                }
+                """.formatted(hashOption,
+                quarantineOption == null ? "" : quarantineOption));
+    }
+
     private static void writeProfileSupportFiles(Path directory) throws IOException {
         Files.writeString(directory.resolve("known_hosts"), "example host key");
         Files.writeString(directory.resolve("id_ed25519"), "test key");
@@ -438,6 +561,7 @@ class SftpValidatorTest {
 
         private final byte[] content;
         private final List<SftpRemoteMetadata> metadata;
+        private byte[] companionContent;
         private final List<SftpRemoteEntry> entries;
         private final Map<String, List<SftpRemoteEntry>> entriesByDirectory;
         private int statCalls;
@@ -489,7 +613,9 @@ class SftpValidatorTest {
             downloadedRemotePath = remotePath;
             downloadedRemotePaths.add(remotePath);
             try {
-                Files.write(localPath, content);
+                Files.write(localPath,
+                        remotePath.endsWith(".meta.csv") && companionContent != null
+                                ? companionContent : content);
             } catch (IOException e) {
                 throw new SftpTransferException("fake download failed", e);
             }

@@ -94,6 +94,8 @@ download into a temporary directory, and delegate content checks to JSON, CSV,
 or fixed-width validation. See the [v2 contract](docs/contracts/sftp-profile-v2.md)
 and [v3 contract](docs/contracts/sftp-profile-v3.md). These CLI features remain
 outside the local GUI workflow.
+An interrupted v3 claim can resume when its matching file is still incoming;
+incomplete or ambiguous deliveries are left untouched and reported as invalid.
 
 Keep local input files, rule files and generated reports in the Git-ignored
 `data/` and `reports/` directories. The GUI validates local files only; use
@@ -352,7 +354,7 @@ batch runs.
 - Report contract: [English](docs/contracts/validation-report-v1.md) / [German](docs/contracts/validation-report-v1.de.md)
 - Batch report contract: [English](docs/contracts/validation-batch-v1.md) / [German](docs/contracts/validation-batch-v1.de.md)
 - [Release checklist](docs/release-checklist.md)
-- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md), [crash recovery and release readiness](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md)
+- Current iterations: [recursive batches](docs/iterations/iteration-14-recursive-batches.md), [batch correction preview](docs/iterations/iteration-15-batch-correction-preview.md), [SARIF batches](docs/iterations/iteration-16-batch-sarif.md), [correction and batch safety](docs/iterations/iteration-17-correction-and-batch-safety.md), [crash recovery and release readiness](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md), [SFTP partial claim recovery](docs/iterations/iteration-19-sftp-partial-claim-recovery.md)
 - [Design decisions](docs/decisions/) and [iterations](docs/iterations/) are
   historical records; their scope statements and test counts describe those
   iterations, not the current feature set.

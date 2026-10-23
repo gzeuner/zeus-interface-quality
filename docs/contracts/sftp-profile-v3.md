@@ -57,15 +57,20 @@ are configured, the validator makes the delivery lifecycle explicit:
 
 `claimRemoteDirectory` and `archiveRemoteDirectory` are optional, but they must
 be configured together. The validator first checks the claim directory for an
-already claimed delivery. If it finds one, it resumes that delivery and does not
-re-select or re-claim the incoming files. Otherwise, it atomically renames every
-selected file from `remoteDirectory` into the claim directory before downloading
-anything.
+already claimed delivery. If it finds a complete delivery, it resumes it and
+does not re-select or re-claim the incoming files. If a process stopped between
+the two file renames, the validator can complete a partial claim when the
+remaining incoming file has the same delivery ID and the combined files form
+exactly one complete delivery. It moves only the incoming file into the claim
+directory. Otherwise, it atomically renames every selected file from
+`remoteDirectory` into the claim directory before downloading anything.
 
 This creates an idempotent recovery point for an interrupted run. A failed claim
 is reported as an operational error and the validator attempts to roll back any
-partially completed claim. The claim directory should be private to the consumer;
-the producer must not write into it.
+partially completed claim. Incomplete, conflicting, or ambiguous files across
+the claim and incoming directories produce an `INVALID` selection without
+downloading or moving files. The claim directory should be private to the
+consumer; the producer must not write into it.
 
 ## Validation and lifecycle
 

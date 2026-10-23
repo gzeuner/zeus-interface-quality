@@ -9,7 +9,13 @@ anwenderrelevante Änderungen.
 
 ### In this update / In diesem Update
 
-- Full Maven package build: 154 tests, 0 failures, 0 errors, 3 skipped
+- SFTP v3 can finish a delivery claim interrupted between its primary and
+  companion renames when the matching file remains in the incoming directory.
+  Ambiguous or conflicting deliveries are left untouched.
+- Focused SFTP verification: 14 tests, 0 failures, 0 errors, 0 skipped.
+- Details: [Iteration 19](docs/iterations/iteration-19-sftp-partial-claim-recovery.md).
+
+- Full Maven package build: 156 tests, 0 failures, 0 errors, 3 skipped
   (2026-10-23). Windows skipped the file-symlink test because symlink creation
   is unavailable; CI runs that test on Linux.
 - Correction sidecar conflicts, active locks and recovery from an unlocked
@@ -83,7 +89,7 @@ version and does not announce a release.
 
 #### Verified in this update
 
-- Full Maven suite: 154 tests, 0 failures, 0 errors, 3 skipped (2026-10-23).
+- Full Maven suite: 156 tests, 0 failures, 0 errors, 3 skipped (2026-10-23).
 - Batch ordering/aggregation and per-file error continuation, recursive discovery,
   batch SARIF mapping, symlink exclusion, correction preview eligibility and
   active correction locks are covered by tests.

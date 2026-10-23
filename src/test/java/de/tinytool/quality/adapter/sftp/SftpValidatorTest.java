@@ -261,6 +261,63 @@ class SftpValidatorTest {
     }
 
     @Test
+    void completesInterruptedPartialClaimFromMatchingIncomingCompanion(@TempDir Path directory) throws Exception {
+        byte[] content = "{\"deliveryId\":\"D-103\",\"quantity\":5}"
+                .getBytes(StandardCharsets.UTF_8);
+        SftpRemoteMetadata fileMetadata = metadata(content.length, 100);
+        FakeTransport transport = new FakeTransport(
+                content,
+                List.of(fileMetadata),
+                Map.of(
+                        "/inbox", List.of(
+                                new SftpRemoteEntry("delivery-D-103.meta.json", fileMetadata)),
+                        "/claim", List.of(
+                                new SftpRemoteEntry("delivery-D-103.json", fileMetadata)),
+                        "/archive", List.of()));
+        Path profile = writeLifecycleProfile(directory);
+
+        var result = new SftpValidator(ignored -> transport).validate(null, profile);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(result.metadata())
+                .containsEntry("deliveryId", "D-103")
+                .containsEntry("filesValidated", 2)
+                .containsEntry("lifecycle", "ARCHIVED");
+        assertThat(transport.downloadedRemotePaths)
+                .containsExactlyInAnyOrder("/claim/delivery-D-103.json", "/claim/delivery-D-103.meta.json");
+        assertThat(transport.movedTo)
+                .contains("/claim/delivery-D-103.meta.json")
+                .anyMatch(path -> path.startsWith("/archive/delivery-D-103.json."))
+                .anyMatch(path -> path.startsWith("/archive/delivery-D-103.meta.json."));
+    }
+
+    @Test
+    void doesNotCombinePartialClaimWithAnotherDelivery(@TempDir Path directory) throws Exception {
+        byte[] content = "{\"deliveryId\":\"D-103\",\"quantity\":5}"
+                .getBytes(StandardCharsets.UTF_8);
+        SftpRemoteMetadata fileMetadata = metadata(content.length, 100);
+        FakeTransport transport = new FakeTransport(
+                content,
+                List.of(fileMetadata),
+                Map.of(
+                        "/inbox", List.of(
+                                new SftpRemoteEntry("delivery-D-104.json", fileMetadata),
+                                new SftpRemoteEntry("delivery-D-104.meta.json", fileMetadata)),
+                        "/claim", List.of(
+                                new SftpRemoteEntry("delivery-D-103.json", fileMetadata)),
+                        "/archive", List.of()));
+        Path profile = writeLifecycleProfile(directory);
+
+        var result = new SftpValidator(ignored -> transport).validate(null, profile);
+
+        assertThat(result.isValid()).isFalse();
+        assertThat(result.findings()).anySatisfy(finding ->
+                assertThat(finding.keyword()).isEqualTo("fileCount"));
+        assertThat(transport.downloadedRemotePath).isNull();
+        assertThat(transport.movedTo).isEmpty();
+    }
+
+    @Test
     void rejectsIncompleteCorrelatedDeliveryWithoutDownloading(@TempDir Path directory) throws Exception {
         byte[] content = "{\"deliveryId\":\"D-102\",\"quantity\":4}"
                 .getBytes(StandardCharsets.UTF_8);

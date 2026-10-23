@@ -210,17 +210,84 @@ public final class SftpValidator implements Validator {
         }
 
         if (profile.lifecycleEnabled()) {
+            List<SftpRemoteEntry> claimedEntries = transport.list(profile.claimRemoteDirectory());
+            List<SftpRemoteEntry> incomingEntries = transport.list(profile.remoteDirectory());
+            if (profile.correlatedDelivery()) {
+                return selectCorrelatedLifecycleDelivery(
+                        claimedEntries, incomingEntries, profile);
+            }
             RemoteSelection claimed = selectFromDirectory(
-                    transport.list(profile.claimRemoteDirectory()),
+                    claimedEntries,
                     profile,
                     profile.claimRemoteDirectory(),
                     true);
             if (!claimed.files().isEmpty() || claimed.matchCount() > 1) {
                 return claimed;
             }
+            if (claimed.matchCount() > 0) {
+                return claimed;
+            }
+            return selectFromDirectory(
+                    incomingEntries, profile, profile.remoteDirectory(), false);
         }
         return selectFromDirectory(
                 transport.list(profile.remoteDirectory()), profile, profile.remoteDirectory(), false);
+    }
+
+    private static RemoteSelection selectCorrelatedLifecycleDelivery(
+            List<SftpRemoteEntry> claimedEntries,
+            List<SftpRemoteEntry> incomingEntries,
+            SftpProfile profile
+    ) {
+        Map<String, DeliveryCandidate> candidates = new LinkedHashMap<>();
+        addDeliveryEntries(candidates, claimedEntries, profile, profile.claimRemoteDirectory(), true);
+        addDeliveryEntries(candidates, incomingEntries, profile, profile.remoteDirectory(), false);
+        List<Map.Entry<String, DeliveryCandidate>> complete = candidates.entrySet().stream()
+                .filter(entry -> entry.getValue().primary.size() == 1
+                        && entry.getValue().companions.size() == 1)
+                .toList();
+        if (complete.size() != 1 || candidates.size() != 1) {
+            return new RemoteSelection(List.of(), null, complete.size() + candidates.size());
+        }
+        Map.Entry<String, DeliveryCandidate> selected = complete.getFirst();
+        String deliveryId = selected.getKey();
+        DeliveryCandidate candidate = selected.getValue();
+        return new RemoteSelection(
+                List.of(
+                        candidate.primary.getFirst().selectedFile(deliveryId, "primary"),
+                        candidate.companions.getFirst().selectedFile(deliveryId, "companion")),
+                deliveryId,
+                1);
+    }
+
+    private static void addDeliveryEntries(
+            Map<String, DeliveryCandidate> candidates,
+            List<SftpRemoteEntry> entries,
+            SftpProfile profile,
+            String directory,
+            boolean claimed
+    ) {
+        for (SftpRemoteEntry entry : entries) {
+            if (entry.metadata() == null || !entry.metadata().regularFile()) {
+                continue;
+            }
+            Matcher matcher = profile.deliveryIdPattern().matcher(entry.name());
+            if (!matcher.matches()) {
+                continue;
+            }
+            String deliveryId = matcher.group("deliveryId");
+            if (deliveryId == null || deliveryId.isBlank()) {
+                continue;
+            }
+            DeliveryCandidate candidate = candidates.computeIfAbsent(
+                    deliveryId, ignored -> new DeliveryCandidate());
+            SourcedRemoteEntry sourced = new SourcedRemoteEntry(entry, directory, claimed);
+            if (profile.fileNamePattern().matcher(entry.name()).matches()) {
+                candidate.primary.add(sourced);
+            } else if (profile.companionFileNamePattern().matcher(entry.name()).matches()) {
+                candidate.companions.add(sourced);
+            }
+        }
     }
 
     private static RemoteSelection selectFromDirectory(
@@ -255,10 +322,14 @@ public final class SftpValidator implements Validator {
         Map<String, DeliveryCandidate> candidates = new LinkedHashMap<>();
         primaryById.forEach((id, files) -> candidates
                 .computeIfAbsent(id, ignored -> new DeliveryCandidate())
-                .primary.addAll(files));
+                .primary.addAll(files.stream()
+                        .map(entry -> new SourcedRemoteEntry(entry, directory, claimed))
+                        .toList()));
         companionById.forEach((id, files) -> candidates
                 .computeIfAbsent(id, ignored -> new DeliveryCandidate())
-                .companions.addAll(files));
+                .companions.addAll(files.stream()
+                        .map(entry -> new SourcedRemoteEntry(entry, directory, claimed))
+                        .toList()));
         List<Map.Entry<String, DeliveryCandidate>> complete = candidates.entrySet().stream()
                 .filter(entry -> entry.getValue().primary.size() == 1
                         && entry.getValue().companions.size() == 1)
@@ -270,9 +341,8 @@ public final class SftpValidator implements Validator {
         DeliveryCandidate candidate = complete.getFirst().getValue();
         return new RemoteSelection(
                 List.of(
-                        toSelectedFile(candidate.primary.getFirst(), directory, "primary", deliveryId, claimed),
-                        toSelectedFile(candidate.companions.getFirst(), directory,
-                                "companion", deliveryId, claimed)),
+                        candidate.primary.getFirst().selectedFile(deliveryId, "primary"),
+                        candidate.companions.getFirst().selectedFile(deliveryId, "companion")),
                 deliveryId,
                 1);
     }
@@ -330,6 +400,10 @@ public final class SftpValidator implements Validator {
         List<SelectedRemoteFile> claimedFiles = new ArrayList<>();
         try {
             for (SelectedRemoteFile file : selection.files()) {
+                if (file.claimed()) {
+                    claimedFiles.add(file);
+                    continue;
+                }
                 String target = joinRemoteDirectory(profile.claimRemoteDirectory(), file.name());
                 transport.move(file.remotePath(), target);
                 claimedFiles.add(new SelectedRemoteFile(
@@ -603,8 +677,20 @@ public final class SftpValidator implements Validator {
 
     private static final class DeliveryCandidate {
 
-        private final List<SftpRemoteEntry> primary = new ArrayList<>();
-        private final List<SftpRemoteEntry> companions = new ArrayList<>();
+        private final List<SourcedRemoteEntry> primary = new ArrayList<>();
+        private final List<SourcedRemoteEntry> companions = new ArrayList<>();
+    }
+
+    private record SourcedRemoteEntry(
+            SftpRemoteEntry entry,
+            String directory,
+            boolean claimed
+    ) {
+
+        private SelectedRemoteFile selectedFile(String deliveryId, String role) {
+            return new SelectedRemoteFile(
+                    entry.name(), joinRemoteDirectory(directory, entry.name()), role, deliveryId, claimed);
+        }
     }
 
     private record LifecycleOutcome(Map<String, Object> metadata) {

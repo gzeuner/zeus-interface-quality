@@ -15,8 +15,11 @@ import de.tinytool.quality.core.ValidationResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -62,18 +65,35 @@ class CsvCorrectionServiceTest {
     void activeCorrectionLockBlocksPreviewAndIsPreserved(@TempDir Path directory) throws Exception {
         Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
         Path input = Files.writeString(directory.resolve("input.csv"), "code\nnot-an-integer\n");
-        Path lock = Files.writeString(directory.resolve("input.csv.correction.lock"), "active");
+        Path lock = directory.resolve("input.csv.correction.lock");
         ValidationResult initial = validator.validate(input, profile, ValidationLanguage.EN);
 
-        ValidationResult preview = correction.preview(input, profile, ValidationLanguage.EN, initial);
-        assertThat(preview.metadata().get("correctionPreview").toString())
-                .contains("eligible=false", "input.csv.correction.lock");
-        assertThatThrownBy(() -> correction.correct(input, profile, ValidationLanguage.EN, initial))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("already exist");
+        try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+             FileLock held = channel.lock()) {
+            ValidationResult preview = correction.preview(input, profile, ValidationLanguage.EN, initial);
+            assertThat(preview.metadata().get("correctionPreview").toString())
+                    .contains("eligible=false", "input.csv.correction.lock");
+            assertThatThrownBy(() -> correction.correct(input, profile, ValidationLanguage.EN, initial))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("already");
 
-        assertThat(Files.readString(lock)).isEqualTo("active");
+            assertThat(Files.exists(lock)).isTrue();
+        }
         assertThat(Files.readString(input)).isEqualTo("code\nnot-an-integer\n");
+    }
+
+    @Test
+    void reusesAnUnlockedLockFileAfterAnInterruptedRun(@TempDir Path directory) throws Exception {
+        Path profile = profile(directory, "\"correction\":{\"enabled\":true}");
+        Path input = Files.writeString(directory.resolve("input.csv"), "code\nnot-an-integer\n");
+        Path staleLock = Files.writeString(directory.resolve("input.csv.correction.lock"), "previous process");
+        ValidationResult initial = validator.validate(input, profile, ValidationLanguage.EN);
+
+        ValidationResult result = correction.correct(input, profile, ValidationLanguage.EN, initial);
+
+        assertThat(result.isValid()).isTrue();
+        assertThat(Files.readString(input)).isEqualTo("code\r\n");
+        assertThat(Files.exists(staleLock)).isTrue();
     }
 
     @Test
@@ -168,7 +188,8 @@ class CsvCorrectionServiceTest {
         assertThat(Files.readString(rejected)).isEqualTo("keep this\n");
         try (var files = Files.list(directory)) {
             assertThat(files.map(path -> path.getFileName().toString()))
-                    .containsExactlyInAnyOrder("profile.json", "input.csv", "input.csv.rejected.csv");
+                    .containsExactlyInAnyOrder("profile.json", "input.csv", "input.csv.rejected.csv",
+                            "input.csv.correction.lock");
         }
     }
 
@@ -186,6 +207,7 @@ class CsvCorrectionServiceTest {
         try (var files = Files.list(directory)) {
             return files.map(path -> path.getFileName().toString())
                     .filter(name -> name.startsWith("input.csv."))
+                    .filter(name -> !name.endsWith(".correction.lock"))
                     .sorted()
                     .toList();
         }

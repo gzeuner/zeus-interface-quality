@@ -15,12 +15,16 @@ import org.apache.commons.csv.CSVRecord;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -57,10 +61,22 @@ public final class CsvCorrectionService {
         Path directory = source.getParent();
         Path correctedTemp = null, rejectedTemp = null, auditTemp = null, backupTemp = null;
         boolean committed = false, preserveArtifacts = false;
-        boolean ownsLock = false, ownsBackup = false, ownsRejected = false, ownsAudit = false;
+        boolean ownsBackup = false, ownsRejected = false, ownsAudit = false;
+        FileChannel lockChannel = null;
+        FileLock correctionLock = null;
         try {
-            Files.createFile(lock);
-            ownsLock = true;
+            if (Files.isSymbolicLink(lock)) {
+                throw new IOException("Correction lock path must not be a symbolic link.");
+            }
+            lockChannel = FileChannel.open(lock, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            try {
+                correctionLock = lockChannel.tryLock();
+            } catch (OverlappingFileLockException e) {
+                throw new IOException("A CSV correction is already in progress for this input.", e);
+            }
+            if (correctionLock == null) {
+                throw new IOException("A CSV correction is already in progress for this input.");
+            }
             if (!existingOutputArtifacts(source).isEmpty()) {
                 throw new IOException("Correction artifacts already exist; refusing to overwrite them.");
             }
@@ -137,7 +153,8 @@ public final class CsvCorrectionService {
                 if (ownsRejected) deleteQuietly(rejected);
                 if (ownsAudit) deleteQuietly(audit);
             }
-            if (ownsLock) deleteQuietly(lock);
+            releaseQuietly(correctionLock);
+            closeQuietly(lockChannel);
             deleteQuietly(correctedTemp);
             deleteQuietly(rejectedTemp);
             deleteQuietly(auditTemp);
@@ -193,8 +210,22 @@ public final class CsvCorrectionService {
     private static List<String> existingArtifacts(Path source) {
         List<String> names = new ArrayList<>(existingOutputArtifacts(source));
         Path lock = source.resolveSibling(source.getFileName() + ".correction.lock");
-        if (Files.exists(lock, LinkOption.NOFOLLOW_LINKS)) names.add(lock.getFileName().toString());
+        if (correctionLockActive(lock)) names.add(lock.getFileName().toString());
         return List.copyOf(names);
+    }
+
+    private static boolean correctionLockActive(Path lock) {
+        if (!Files.exists(lock, LinkOption.NOFOLLOW_LINKS)) return false;
+        if (Files.isSymbolicLink(lock)) return true;
+        try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.WRITE)) {
+            try (FileLock acquired = channel.tryLock()) {
+                return acquired == null;
+            } catch (OverlappingFileLockException e) {
+                return true;
+            }
+        } catch (IOException e) {
+            return true;
+        }
     }
 
     private static List<String> existingOutputArtifacts(Path source) {
@@ -248,5 +279,13 @@ public final class CsvCorrectionService {
 
     private static void deleteQuietly(Path path) {
         if (path != null) try { Files.deleteIfExists(path); } catch (IOException ignored) { }
+    }
+
+    private static void releaseQuietly(FileLock lock) {
+        if (lock != null) try { lock.release(); } catch (IOException ignored) { }
+    }
+
+    private static void closeQuietly(FileChannel channel) {
+        if (channel != null) try { channel.close(); } catch (IOException ignored) { }
     }
 }

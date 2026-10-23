@@ -362,7 +362,8 @@ dateiübergreifend. `--dry-run-correction` bleibt auch im Batch schreibgeschütz
 - Beispiele: [Deutsch](docs/examples/README.de.md) / [English](docs/examples/README.md)
 - Reportvertrag: [Deutsch](docs/contracts/validation-report-v1.de.md) / [English](docs/contracts/validation-report-v1.md)
 - Batch-Reportvertrag: [Deutsch](docs/contracts/validation-batch-v1.de.md) / [English](docs/contracts/validation-batch-v1.md)
-- Umgesetzte Iterationen: [rekursive Batches](docs/iterations/iteration-14-recursive-batches.md), [Batch-Korrekturvorschau](docs/iterations/iteration-15-batch-correction-preview.md), [Batch-SARIF](docs/iterations/iteration-16-batch-sarif.md), [Korrektur- und Batch-Sicherheit](docs/iterations/iteration-17-correction-and-batch-safety.md)
+- [Release-Checkliste](docs/release-checklist.md)
+- Umgesetzte Iterationen: [rekursive Batches](docs/iterations/iteration-14-recursive-batches.md), [Batch-Korrekturvorschau](docs/iterations/iteration-15-batch-correction-preview.md), [Batch-SARIF](docs/iterations/iteration-16-batch-sarif.md), [Korrektur- und Batch-Sicherheit](docs/iterations/iteration-17-correction-and-batch-safety.md), [Absturzwiederherstellung und Release-Vorbereitung](docs/iterations/iteration-18-crash-safe-correction-and-release-readiness.md)
 - [Entscheidungen](docs/decisions/) und [Iterationen](docs/iterations/) bleiben
   historische Aufzeichnungen. Dortige Funktionsgrenzen und Testzahlen beziehen
   sich auf den jeweiligen damaligen Stand.

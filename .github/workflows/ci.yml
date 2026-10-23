@@ -17,8 +17,12 @@ permissions:
 
 jobs:
   build:
-    name: JDK 21 build
-    runs-on: ubuntu-latest
+    name: JDK 21 build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -31,23 +35,91 @@ jobs:
           cache: maven
 
       - name: Check POSIX GUI launcher
+        if: runner.os == 'Linux'
         run: |
           sh -n start-gui.sh
           test -x start-gui.sh
 
-      - name: Run tests
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
         run: ./mvnw -B test
 
-      - name: Build package
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: .\mvnw.cmd -B test
+
+      - name: Build package (Linux)
+        if: runner.os == 'Linux'
         run: ./mvnw -B package
 
+      - name: Build package (Windows)
+        if: runner.os == 'Windows'
+        run: .\mvnw.cmd -B package
+
+      - name: Smoke test Windows GUI launcher
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\start-gui.cmd --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Smoke test POSIX GUI launcher
+        if: runner.os == 'Linux'
+        run: ./start-gui.sh --help
+
+      - name: Check repeatable package build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cp target/zeus-interface-quality-0.1.0-SNAPSHOT.jar "$RUNNER_TEMP/zeus-first-build.jar"
+          ./mvnw -B -DskipTests clean package
+          cmp "$RUNNER_TEMP/zeus-first-build.jar" target/zeus-interface-quality-0.1.0-SNAPSHOT.jar
+
+      - name: Check repeatable package build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $jar = 'target/zeus-interface-quality-0.1.0-SNAPSHOT.jar'
+          $firstBuild = Join-Path $env:RUNNER_TEMP 'zeus-first-build.jar'
+          Copy-Item $jar $firstBuild
+          .\mvnw.cmd -B -DskipTests clean package
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $firstHash = (Get-FileHash $firstBuild -Algorithm SHA256).Hash
+          $secondHash = (Get-FileHash $jar -Algorithm SHA256).Hash
+          if ($firstHash -ne $secondHash) { throw 'Repeated clean builds produced different JAR checksums.' }
+
+      - name: Create package checksum (Linux)
+        if: runner.os == 'Linux'
+        run: sha256sum target/zeus-interface-quality-0.1.0-SNAPSHOT.jar > target/zeus-interface-quality-0.1.0-SNAPSHOT.jar.sha256
+
+      - name: Create package checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $jar = 'target/zeus-interface-quality-0.1.0-SNAPSHOT.jar'
+          $digest = (Get-FileHash $jar -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText("$jar.sha256", "$digest  zeus-interface-quality-0.1.0-SNAPSHOT.jar`n", [System.Text.Encoding]::ASCII)
+
+      - name: Smoke test packaged CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $jar = 'target/zeus-interface-quality-0.1.0-SNAPSHOT.jar'
+          java -jar $jar --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          java -jar $jar validate --schema src/test/resources/fixtures/delivery.schema.json --input src/test/resources/fixtures/valid-delivery.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          java -jar $jar validate --schema src/test/resources/fixtures/delivery.schema.json --input src/test/resources/fixtures/invalid-wrong-type.json
+          if ($LASTEXITCODE -ne 1) { exit 1 }
+
       - name: Smoke test valid fixture
+        if: runner.os == 'Linux'
         run: >-
           java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
           --schema src/test/resources/fixtures/delivery.schema.json
           --input src/test/resources/fixtures/valid-delivery.json
 
       - name: Smoke test invalid fixture
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set +e
@@ -58,6 +130,7 @@ jobs:
           test "$exit_code" -eq 1 || exit 1
 
       - name: Smoke test valid fixed-width fixture
+        if: runner.os == 'Linux'
         run: >-
           java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
           --input-format fixed-width
@@ -65,6 +138,7 @@ jobs:
           --input src/test/resources/fixtures/fixedwidth/valid-delivery.dat
 
       - name: Smoke test invalid fixed-width fixture
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set +e
@@ -76,6 +150,7 @@ jobs:
           test "$exit_code" -eq 1 || exit 1
 
       - name: Smoke test valid CSV fixture
+        if: runner.os == 'Linux'
         run: >-
           java -jar target/zeus-interface-quality-0.1.0-SNAPSHOT.jar validate
           --profile docs/examples/fictional-bicycle-rentals.csv-profile.json
@@ -83,6 +158,7 @@ jobs:
           --local-only
 
       - name: Smoke test invalid CSV fixture
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           set +e
@@ -94,3 +170,12 @@ jobs:
           exit_code=$?
           test "$exit_code" -eq 1 || exit 1
           python3 -c 'import json; d=json.load(open("target/fictional-bicycle-rentals-invalid.report.json")); assert d["status"] == "INVALID" and len(d["findings"]) == 5'
+
+      - name: Upload packaged application
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeus-interface-quality-${{ runner.os }}
+          path: |
+            target/zeus-interface-quality-0.1.0-SNAPSHOT.jar
+            target/zeus-interface-quality-0.1.0-SNAPSHOT.jar.sha256
+          if-no-files-found: error
